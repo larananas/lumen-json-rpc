@@ -1,5 +1,9 @@
 # Lumen JSON-RPC
 
+<p align="center">
+  <img src=".github/assets/logo.svg" alt="Lumen JSON-RPC logo" width="420">
+</p>
+
 [![Tests](https://github.com/larananas/lumen-json-rpc/actions/workflows/ci.yml/badge.svg)](https://github.com/larananas/lumen-json-rpc/actions/workflows/ci.yml)
 [![License: LGPL-3.0-or-later](https://img.shields.io/badge/license-LGPL--3.0--or--later-blue.svg)](LICENSE)
 [![PHP](https://img.shields.io/badge/PHP-modern-777bb4.svg)](#)
