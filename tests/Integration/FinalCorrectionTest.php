@@ -17,6 +17,7 @@ use Lumen\JsonRpc\RateLimit\RateLimitManager;
 use Lumen\JsonRpc\Server\JsonRpcServer;
 use Lumen\JsonRpc\Support\HookPoint;
 use Lumen\JsonRpc\Support\RequestContext;
+use PHPUnit\Framework\Attributes\WithoutErrorHandler;
 use PHPUnit\Framework\TestCase;
 
 final class FinalCorrectionTest extends TestCase
@@ -249,6 +250,7 @@ final class FinalCorrectionTest extends TestCase
         }
     }
 
+    #[WithoutErrorHandler]
     public function testFailOpenAllowsOnStorageError(): void
     {
         $limiter = new FileRateLimiter(
@@ -257,10 +259,20 @@ final class FinalCorrectionTest extends TestCase
             storagePath: '/nonexistent/path/that/cannot/be/created',
             failOpen: true,
         );
-        $result = $limiter->check('test_key');
+
+        set_error_handler(static function (int $severity): bool {
+            return $severity === E_USER_WARNING;
+        });
+        try {
+            $result = $limiter->check('test_key');
+        } finally {
+            restore_error_handler();
+        }
+
         $this->assertTrue($result->allowed);
     }
 
+    #[WithoutErrorHandler]
     public function testFailClosedDeniesOnStorageError(): void
     {
         if (PHP_OS_FAMILY === 'Windows') {
@@ -275,7 +287,16 @@ final class FinalCorrectionTest extends TestCase
             storagePath: $readonlyDir . '/deep',
             failOpen: false,
         );
-        $result = $limiter->check('test_key');
+
+        set_error_handler(static function (int $severity): bool {
+            return $severity === E_USER_WARNING;
+        });
+        try {
+            $result = $limiter->check('test_key');
+        } finally {
+            restore_error_handler();
+        }
+
         chmod($readonlyDir, 0755);
         @rmdir($readonlyDir);
         $this->assertFalse($result->allowed);
