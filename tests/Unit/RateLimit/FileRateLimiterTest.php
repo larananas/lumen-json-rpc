@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Lumen\JsonRpc\Tests\Unit\RateLimit;
 
 use Lumen\JsonRpc\RateLimit\FileRateLimiter;
+use PHPUnit\Framework\Attributes\WithoutErrorHandler;
 use PHPUnit\Framework\TestCase;
 
 final class FileRateLimiterTest extends TestCase
@@ -91,6 +92,7 @@ final class FileRateLimiterTest extends TestCase
     $this->assertEquals(0, $result3->remaining);
   }
 
+  #[WithoutErrorHandler]
   public function testFailOpenOnBadPath(): void
   {
     if (PHP_OS_FAMILY === "Windows" || !is_dir("/proc")) {
@@ -102,7 +104,7 @@ final class FileRateLimiterTest extends TestCase
     $limiter = new FileRateLimiter(
       10,
       60,
-      "/proc/jsonrpc_rate_limit_fail_open_" . uniqid(),
+      "/proc/jsonrpc_rate_limit_fail_open_" . uniqid("", true),
       failOpen: true,
     );
 
@@ -127,8 +129,13 @@ final class FileRateLimiterTest extends TestCase
 
     $this->assertTrue($result->allowed);
     $this->assertNotEmpty($warnings);
+    $this->assertStringContainsString(
+      "fail-open allowing request",
+      $warnings[0],
+    );
   }
 
+  #[WithoutErrorHandler]
   public function testFailClosedOnBadPath(): void
   {
     if (PHP_OS_FAMILY === "Windows" || !is_dir("/proc")) {
@@ -140,7 +147,7 @@ final class FileRateLimiterTest extends TestCase
     $limiter = new FileRateLimiter(
       10,
       60,
-      "/proc/jsonrpc_rate_limit_fail_closed_" . uniqid(),
+      "/proc/jsonrpc_rate_limit_fail_closed_" . uniqid("", true),
       failOpen: false,
     );
 
@@ -165,5 +172,9 @@ final class FileRateLimiterTest extends TestCase
 
     $this->assertFalse($result->allowed);
     $this->assertNotEmpty($warnings);
+    $this->assertStringContainsString(
+      "fail-closed denying request",
+      $warnings[0],
+    );
   }
 }
