@@ -24,7 +24,7 @@ jobs:
           php-version: "8.1"
           coverage: none
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.composer/cache/files
           key: composer-${{ runner.os }}-${{ hashFiles('composer.json') }}
@@ -50,7 +50,7 @@ jobs:
           php-version: ${{ matrix.php }}
           coverage: none
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.composer/cache/files
           key: composer-${{ runner.os }}-${{ matrix.php }}-${{ hashFiles('composer.json') }}
