@@ -289,21 +289,21 @@ If you do nothing, normal parameter binding still works exactly fine.
 This is a **scope-level comparison** based on public docs and default library behavior.
 It is intentionally simplified and focused on developer-facing features.
 
-| Feature | Lumen JSON-RPC | UMA / `uma/json-rpc` | Datto ecosystem | `fguillot/json-rpc` |
+| Feature | Lumen JSON-RPC | uma/json-rpc | datto/json-rpc | fguillot/json-rpc |
 |---|---:|---:|---:|---:|
-| Framework-free server | 🟢 ✅ | 🟢 ✅ | 🟢 ✅ | 🟢 ✅ |
-| HTTP support out of the box | 🟢 ✅ | 🔴 ❌ | 🟢 ✅ | 🟢 ✅ |
-| Direct core usage without HTTP | 🟢 ✅ | 🟢 ✅ | 🟢 ✅ | 🔴 ❌ |
-| Strict `handler.method` auto-discovery | 🟢 ✅ | 🔴 ❌ | 🔴 ❌ | 🔴 ❌ |
-| Middleware pipeline | 🟢 ✅ | 🟢 ✅ | 🔴 ❌ | 🟢 ✅ |
-| Optional advanced param validation | 🟢 ✅ | 🟢 ✅ | 🟡 ~ | 🔴 ❌ |
-| JWT built in | 🟢 ✅ | 🔴 ❌ | 🟡 ~ | 🔴 ❌ |
-| API key built in | 🟢 ✅ | 🔴 ❌ | 🟡 ~ | 🔴 ❌ |
-| Basic auth built in | 🟢 ✅ | 🔴 ❌ | 🟡 ~ | 🟢 ✅ |
-| Rate limiting built in | 🟢 ✅ | 🔴 ❌ | 🔴 ❌ | 🔴 ❌ |
-| Gzip support built in | 🟢 ✅ | 🔴 ❌ | 🔴 ❌ | 🔴 ❌ |
-| Docs generation built in | 🟢 ✅ | 🔴 ❌ | 🔴 ❌ | 🔴 ❌ |
-| No mandatory external Composer deps in production | 🟢 ✅ | 🔴 ❌ | 🟢 ✅ | 🟢 ✅ |
+| Framework-free server | ✅ | ✅ | ✅ | ✅ |
+| HTTP support out of the box | ✅ | ❌ | ✅ | ✅ |
+| Direct core usage without HTTP | ✅ | ✅ | ✅ | ❌ |
+| Strict `handler.method` auto-discovery | ✅ | ❌ | ❌ | ❌ |
+| Middleware pipeline | ✅ | ✅ | ❌ | ✅ |
+| Optional advanced param validation | ✅ | ✅ | 🟡~ | ❌ |
+| JWT built in | ✅ | ❌ | 🟡~ | ❌ |
+| API key built in | ✅ | ❌ | 🟡~ | ❌ |
+| Basic auth built in | ✅ | ❌ | 🟡~ | ✅ |
+| Rate limiting built in | ✅ | ❌ | ❌ | ❌ |
+| Gzip support built in | ✅ | ❌ | ❌ | ❌ |
+| Docs generation built in | ✅ | ❌ | ❌ | ❌ |
+| No mandatory external Composer deps in production | ✅ | ❌ | ✅ | ✅ |
 
 ### Why this matters
 
