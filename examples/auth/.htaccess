@@ -1,0 +1,5 @@
+RewriteEngine On
+
+# Forward the Authorization header so PHP can read bearer tokens.
+RewriteCond %{HTTP:Authorization} ^(.*)
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%1]

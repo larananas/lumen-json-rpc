@@ -12,23 +12,45 @@
 
 </div>
 
-> ✨ Framework-free JSON-RPC for PHP — clean handlers, strong defaults, auth, gzip, rate limiting, hooks, and docs generation.
+> ✨ Framework-free JSON-RPC for PHP — strict `handler.method` routing, strong defaults, auth drivers, gzip, rate limiting, middleware, schema validation, direct core usage, and docs generation.
 
 A production-grade, framework-free JSON-RPC server library for modern PHP.
 
-It gives you a clean way to expose handlers you control, keep your code explicit, and still get the features you actually need in real projects: strict protocol handling, auth, gzip, batching, rate limiting, structured logging, hooks, and documentation generation.
+It keeps the boring parts solid — request validation, batching, auth, compression, rate limiting, hooks, docs, and predictable handler execution — while keeping your application code explicit and reviewable.
 
 ---
 
-## ✨ Why
+## 🚀 Why this feels good in real projects
 
-You need a JSON-RPC 2.0 server that:
+Lumen JSON-RPC is built for developers who want a **real server library**, not a vague protocol toolkit and not a heavy framework abstraction.
 
-- 🧱 works as a standalone library
-- 🎯 uses handlers you control, with zero magic
-- 🔐 handles auth, rate limiting, logging, and batching out of the box
-- ✅ ships with strict spec compliance and safe defaults
-- 🛠️ stays explicit, reviewable, and easy to wire into a plain PHP app
+### You get, out of the box
+
+- 🧱 **Standalone library** — plain PHP, no framework required
+- 🎯 **Strict `handler.method` mapping** — predictable and easy to review
+- 🔐 **Auth drivers built in** — JWT, API key, or HTTP Basic
+- 🧩 **Direct core usage** — use HTTP by default, or call the engine directly
+- 🧪 **Strong protocol handling** — strict request validation, batching, notifications
+- 🛡️ **Safe defaults** — reserved methods blocked, magic methods excluded, public instance methods only
+- 🗜️ **Compression + rate limiting** — useful production features without extra packages
+- 🪝 **Hooks + middleware** — extension points without turning the library into a framework
+- 📚 **Docs generation** — generate API docs from your handlers
+
+### What it is trying to be
+
+A clean JSON-RPC 2.0 server for PHP that stays:
+
+- explicit
+- composable
+- easy to wire into a plain app
+- strict enough to be trusted
+
+### What it is **not** trying to be
+
+- a full framework
+- a giant DI container
+- a magical procedure registry
+- a “bring 12 packages before hello world” library
 
 ---
 
@@ -38,14 +60,18 @@ You need a JSON-RPC 2.0 server that:
 composer require larananas/lumen-json-rpc
 ```
 
-JWT auth works with the built-in HMAC decoder.
-Optionally install `firebase/php-jwt` for broader algorithm support.
+### Optional extras
+
+- `ext-zlib` → enables gzip request / response support
+- `firebase/php-jwt` → enables broader JWT algorithm support
+
+Without optional extras, the library still works.
 
 ---
 
-## 🚀 Quick Start
+## ⚡ Quick Start
 
-### 1. Create an entry point (`public/index.php`)
+### 1) Create an entry point (`public/index.php`)
 
 ```php
 <?php
@@ -68,7 +94,7 @@ $server = new JsonRpcServer($config);
 $server->run();
 ```
 
-### 2. Create a handler (`handlers/User.php`)
+### 2) Create a handler (`handlers/User.php`)
 
 ```php
 <?php
@@ -79,25 +105,20 @@ namespace App\Handlers;
 
 use Lumen\JsonRpc\Support\RequestContext;
 
-class User
+final class User
 {
-    public function __construct(private RequestContext $context) {}
-
-    /**
-     * Get a user by ID.
-     * @param int $id The user ID
-     */
     public function get(RequestContext $context, int $id): array
     {
         return [
             'id' => $id,
             'name' => 'Example User',
+            'requested_by' => $context->authUserId,
         ];
     }
 }
 ```
 
-### 3. Send a request
+### 3) Send a request
 
 ```bash
 curl -X POST http://localhost:8000/ \
@@ -105,17 +126,17 @@ curl -X POST http://localhost:8000/ \
   -d '{"jsonrpc":"2.0","method":"user.get","params":{"id":1},"id":1}'
 ```
 
-### 4. Example response
+### 4) Response
 
 ```json
-{"jsonrpc":"2.0","result":{"id":1,"name":"Example User"},"id":1}
+{"jsonrpc":"2.0","result":{"id":1,"name":"Example User","requested_by":null},"id":1}
 ```
 
 ---
 
-## 🧭 Method Mapping
+## 🧭 The 30-second mental model
 
-Methods follow the `handler.method` pattern *(configurable via `method_separator`)*:
+Methods follow the `handler.method` pattern:
 
 | JSON-RPC Method | Handler Class         | Method     |
 | --------------- | --------------------- | ---------- |
@@ -123,10 +144,224 @@ Methods follow the `handler.method` pattern *(configurable via `method_separator
 | `user.create`   | `handlers/User.php`   | `create()` |
 | `system.health` | `handlers/System.php` | `health()` |
 
-The handler class receives a `RequestContext` as its first constructor argument.
-Methods that need context receive it as the first parameter.
+That means:
 
-Each request creates a **fresh handler instance**, preventing stale context leaks across requests.
+- `user.get` → handler class `User`
+- method `get()` on that handler
+- discovered from your configured handlers path + namespace
+
+No manual method registry.
+No hidden auto-generated procedures.
+No “where is this route even defined?” nonsense.
+
+---
+
+## ✨ What you gain beyond basic JSON-RPC
+
+### 🔐 Multiple auth drivers
+
+You can protect method prefixes with:
+
+- JWT *(default driver when auth is enabled)*
+- API key
+- HTTP Basic
+
+```php
+'auth' => [
+    'enabled' => true,
+    'driver' => 'jwt', // jwt | api_key | basic
+    'protected_methods' => ['user.', 'order.'],
+],
+```
+
+### 🧩 Direct core usage
+
+HTTP is still the default, but you can also call the engine directly when you need transport-independent usage.
+
+```php
+<?php
+
+use Lumen\JsonRpc\Support\RequestContext;
+
+$context = new RequestContext(
+    correlationId: 'demo-1',
+    headers: [],
+    clientIp: '127.0.0.1',
+    requestBody: '{"jsonrpc":"2.0","method":"system.health","id":1}'
+);
+
+$json = $server->handleJson(
+    '{"jsonrpc":"2.0","method":"system.health","id":1}',
+    $context,
+);
+
+echo $json;
+```
+
+### 🏗️ Handler factory for lightweight DI
+
+You can inject app services into handlers without forcing a framework container.
+
+```php
+<?php
+
+use Lumen\JsonRpc\Dispatcher\HandlerFactoryInterface;
+use Lumen\JsonRpc\Support\RequestContext;
+
+$factory = new class($db) implements HandlerFactoryInterface {
+    public function __construct(private DatabaseService $db) {}
+
+    public function create(string $className, RequestContext $context): object
+    {
+        return new $className($this->db);
+    }
+};
+
+$server->setHandlerFactory($factory);
+```
+
+### 🪝 Middleware pipeline
+
+Run logic before / after each request without mixing it into handlers.
+
+```php
+<?php
+
+use Lumen\JsonRpc\Middleware\MiddlewareInterface;
+use Lumen\JsonRpc\Protocol\Request;
+use Lumen\JsonRpc\Protocol\Response;
+use Lumen\JsonRpc\Support\RequestContext;
+
+$server->addMiddleware(new class implements MiddlewareInterface {
+    public function process(Request $request, RequestContext $context, callable $next): ?Response
+    {
+        error_log("[JSON-RPC] -> {$request->method}");
+        $response = $next($request, $context);
+        error_log('[JSON-RPC] <- done');
+        return $response;
+    }
+});
+```
+
+### ✅ Optional schema validation
+
+When you want more than simple type binding, a handler can provide a lightweight validation schema.
+
+```php
+<?php
+
+use Lumen\JsonRpc\Validation\RpcSchemaProviderInterface;
+
+final class Product implements RpcSchemaProviderInterface
+{
+    public static function rpcValidationSchemas(): array
+    {
+        return [
+            'create' => [
+                'type' => 'object',
+                'required' => ['name', 'price'],
+                'properties' => [
+                    'name' => ['type' => 'string', 'minLength' => 1],
+                    'price' => ['type' => 'number'],
+                ],
+                'additionalProperties' => false,
+            ],
+        ];
+    }
+}
+```
+
+Enable it with:
+
+```php
+'validation' => [
+    'strict' => true,
+    'schema' => ['enabled' => true],
+],
+```
+
+If you do nothing, normal parameter binding still works exactly fine.
+
+---
+
+## 🆚 At a glance: how it compares
+
+This is a **scope-level comparison** based on public docs and default library behavior.
+It is intentionally simplified and focused on developer-facing features.
+
+| Feature | Lumen JSON-RPC | UMA / `uma/json-rpc` | Datto ecosystem | `fguillot/json-rpc` |
+|---|---:|---:|---:|---:|
+| Framework-free server | 🟢 ✅ | 🟢 ✅ | 🟢 ✅ | 🟢 ✅ |
+| HTTP support out of the box | 🟢 ✅ | 🔴 ❌ | 🟢 ✅ | 🟢 ✅ |
+| Direct core usage without HTTP | 🟢 ✅ | 🟢 ✅ | 🟢 ✅ | 🔴 ❌ |
+| Strict `handler.method` auto-discovery | 🟢 ✅ | 🔴 ❌ | 🔴 ❌ | 🔴 ❌ |
+| Middleware pipeline | 🟢 ✅ | 🟢 ✅ | 🔴 ❌ | 🟢 ✅ |
+| Optional advanced param validation | 🟢 ✅ | 🟢 ✅ | 🟡 ~ | 🔴 ❌ |
+| JWT built in | 🟢 ✅ | 🔴 ❌ | 🟡 ~ | 🔴 ❌ |
+| API key built in | 🟢 ✅ | 🔴 ❌ | 🟡 ~ | 🔴 ❌ |
+| Basic auth built in | 🟢 ✅ | 🔴 ❌ | 🟡 ~ | 🟢 ✅ |
+| Rate limiting built in | 🟢 ✅ | 🔴 ❌ | 🔴 ❌ | 🔴 ❌ |
+| Gzip support built in | 🟢 ✅ | 🔴 ❌ | 🔴 ❌ | 🔴 ❌ |
+| Docs generation built in | 🟢 ✅ | 🔴 ❌ | 🔴 ❌ | 🔴 ❌ |
+| No mandatory external Composer deps in production | 🟢 ✅ | 🔴 ❌ | 🟢 ✅ | 🟢 ✅ |
+
+### Why this matters
+
+Lumen JSON-RPC is opinionated in a very specific way:
+
+- **stricter than the “just map whatever” style**
+- **more complete than minimal protocol-only cores**
+- **lighter than solutions that push you into container/schema stacks immediately**
+
+If that trade-off matches how you like to build plain PHP backends, that is exactly where it shines.
+
+---
+
+## 🧠 Design decisions
+
+These choices are intentional.
+They are not accidental omissions.
+
+### 1) Why `handler.method`?
+
+Because it stays easy to reason about.
+
+When you see `user.get`, you know where to look:
+
+- handler `User`
+- method `get()`
+- in your configured handlers path
+
+That keeps the execution path explicit, reviewable, and boring in a good way.
+
+### 2) Why no manual method registry?
+
+Because a second mapping layer becomes busywork fast.
+
+A lot of JSON-RPC libraries let you manually register callbacks or procedure maps.
+That can be useful in tiny demos, but in real apps it also means:
+
+- more wiring to maintain
+- more chances to forget an entry
+- more distance between the request method and the actual PHP code
+
+Lumen JSON-RPC chooses discovery + convention instead.
+If the handler exists and the method is callable, the library can resolve it directly.
+
+### 3) Why JWT by default when auth is enabled?
+
+Because it is the most common modern default for API-style auth.
+
+But “default” does **not** mean “forced”.
+
+You can switch to:
+
+- `api_key`
+- `basic`
+
+without changing the rest of the server model.
+
+So the default is opinionated, but the library is still practical.
 
 ---
 
@@ -134,58 +369,103 @@ Each request creates a **fresh handler instance**, preventing stale context leak
 
 The resolver is intentionally strict:
 
-* Methods starting with `rpc.` are always rejected
-  *(reserved by the JSON-RPC 2.0 spec, independent of the configured separator)*
-* Method names must match `^[a-zA-Z][a-zA-Z0-9]*{sep}[a-zA-Z][a-zA-Z0-9_]*$`
-* Magic methods (`__construct`, `__call`, etc.) are blocked
-* Only public instance methods declared on the concrete handler class are callable
-* Static methods, inherited methods, and internal framework methods are excluded
+- methods starting with `rpc.` are always rejected
+- method names must match `handler.method`
+- magic methods (`__construct`, `__call`, etc.) are blocked
+- only **public instance methods declared on the concrete handler class** are callable
+- static methods are excluded
+- inherited methods are excluded
+- internal framework/library methods are excluded
 
-This keeps execution paths explicit, predictable, and reviewable.
+This keeps execution paths explicit and limits surprises.
 
 ---
 
 ## 🔐 Authentication
 
-Enable JWT authentication:
+### Available drivers
+
+- `jwt` *(default when auth is enabled)*
+- `api_key`
+- `basic`
+
+### Example: JWT
 
 ```php
 'auth' => [
     'enabled' => true,
+    'driver' => 'jwt',
     'protected_methods' => ['user.', 'order.'],
     'jwt' => [
         'secret' => 'your-secret-key',
         'algorithm' => 'HS256',
+        'header' => 'Authorization',
+        'prefix' => 'Bearer ',
+        'issuer' => '',
+        'audience' => '',
+        'leeway' => 0,
     ],
 ],
 ```
 
-### Behavior
-
-* Methods matching any prefix in `protected_methods` require a valid JWT
-* Unauthenticated requests to protected methods receive `-32001 Authentication required`
-* The `auth.jwt.header` config controls which HTTP header is checked *(default: `Authorization`)*
-* The built-in decoder supports `HS256`, `HS384`, and `HS512`
-* The `none` algorithm is always rejected
-* Claims `exp`, `nbf`, `iat`, `iss`, and `aud` are validated when configured
-* `leeway` helps with clock skew
-* Install `firebase/php-jwt` for broader algorithm support
-
-### Access auth context in handlers
+### Example: API key
 
 ```php
-public function get(RequestContext $context, int $id): array
-{
-    $userId = $context->authUserId;
-    $roles  = $context->authRoles;
-    $email  = $context->getClaim('email');
+'auth' => [
+    'enabled' => true,
+    'driver' => 'api_key',
+    'protected_methods' => ['user.'],
+    'api_key' => [
+        'header' => 'X-API-Key',
+        'keys' => [
+            'demo-key-123' => [
+                'user_id' => 'service-name',
+                'roles' => ['service'],
+                'claims' => ['source' => 'api_key'],
+            ],
+        ],
+    ],
+],
+```
 
+### Example: Basic auth
+
+```php
+'auth' => [
+    'enabled' => true,
+    'driver' => 'basic',
+    'protected_methods' => ['user.'],
+    'basic' => [
+        'users' => [
+            'admin' => [
+                'password' => 'secret',
+                'user_id' => 'admin',
+                'roles' => ['admin'],
+            ],
+        ],
+    ],
+],
+```
+
+### Access auth data in handlers
+
+```php
+public function me(RequestContext $context): array
+{
     return [
-        'id' => $id,
-        'requested_by' => $userId,
+        'id' => $context->authUserId,
+        'roles' => $context->authRoles,
+        'email' => $context->getClaim('email'),
     ];
 }
 ```
+
+See:
+
+- [docs/authentication.md](docs/authentication.md)
+- [examples/auth/](examples/auth/)
+
+> **Apache note:** depending on your setup, you may need to forward the `Authorization` header explicitly. See the authentication docs and the auth example for a working `.htaccess` snippet.
 
 ---
 
@@ -205,13 +485,12 @@ File-based rate limiting with atomic file locking:
 
 Rate-limited requests return:
 
-* HTTP `429`
-* JSON-RPC error `-32000`
-* headers such as:
-
-  * `X-RateLimit-Limit`
-  * `X-RateLimit-Remaining`
-  * `Retry-After`
+- HTTP `429`
+- JSON-RPC error `-32000`
+- headers such as:
+  - `X-RateLimit-Limit`
+  - `X-RateLimit-Remaining`
+  - `Retry-After`
 
 Batch weight counts actual items received, and consumption is atomic.
 
@@ -219,9 +498,13 @@ Batch weight counts actual items received, and consumption is atomic.
 
 ## 🗜️ Compression
 
-* `compression.request_gzip: true` *(default)* — accept `Content-Encoding: gzip`
-  Size limits are enforced **before and after** decompression.
-* `compression.response_gzip: true` — send gzip-encoded responses when the client sends `Accept-Encoding: gzip`.
+If `ext-zlib` is available:
+
+- `compression.request_gzip: true` *(default)* accepts `Content-Encoding: gzip`
+- `compression.response_gzip: true` sends gzipped responses when the client advertises support
+
+If `ext-zlib` is not available, the library degrades cleanly.
+It does not become uninstallable just because gzip is unavailable.
 
 ---
 
@@ -231,22 +514,30 @@ Batch weight counts actual items received, and consumption is atomic.
 'response_fingerprint' => ['enabled' => true, 'algorithm' => 'sha256'],
 ```
 
-Successful responses include an `ETag` header.
+Successful single responses can include an `ETag` header.
+Clients can then use `If-None-Match` for conditional requests:
 
-Clients can use `If-None-Match` for conditional requests:
-
-* matching fingerprint → HTTP `304`
-* applies to non-batch single requests only
+- matching fingerprint → HTTP `304`
+- applies to non-batch single requests only
 
 ---
 
-## 🪝 Hooks / Extension Points
+## 🪝 Hooks and middleware
+
+Hooks and middleware are complementary:
+
+- **hooks** are great for lightweight lifecycle events
+- **middleware** is better when you want to wrap request execution
+
+### Hook flow
 
 ```text
 BEFORE_REQUEST -> BEFORE_HANDLER -> [handler] -> AFTER_HANDLER -> ON_RESPONSE -> AFTER_REQUEST
 ON_ERROR fires instead of AFTER_HANDLER on exception.
 ON_AUTH_SUCCESS / ON_AUTH_FAILURE fire during authentication.
 ```
+
+### Hook example
 
 ```php
 $server->getHooks()->register(
@@ -257,45 +548,38 @@ $server->getHooks()->register(
 );
 ```
 
-GET health requests fire a reduced set:
+---
 
-* `BEFORE_REQUEST`
-* `ON_RESPONSE`
-* `AFTER_REQUEST`
+## 🌐 Transport behavior
 
-with `health: true` in context.
+- `POST /` handles JSON-RPC requests
+- empty POST body returns `-32600 Invalid Request`
+- `GET /` returns a health/status JSON when `health.enabled` is `true`
+- non-POST, non-GET methods return HTTP `405`
+- set `content_type.strict: true` to require `application/json` on POST
 
 ---
 
-## 🌐 Transport Behavior
-
-* `POST /` handles JSON-RPC requests
-* An empty POST body returns `-32600 Invalid Request`
-* `GET /` returns a health/status JSON when `health.enabled` is `true`
-* Non-POST, non-GET methods return HTTP `405`
-* Set `content_type.strict: true` to require `application/json` on POST
-
----
-
-## 🧠 Parameter Binding
+## 🧠 Parameter binding
 
 Parameters are type-checked and mapped to `-32602 Invalid params` for mismatches.
 
 ### Supported behavior
 
-* Wrong scalar types produce `-32602`
-* Missing required parameters produce `-32602`
-* Unknown named parameters produce `-32602`
-* Surplus positional parameters produce `-32602`
-* Optional parameters use their defaults when omitted
-* Both positional and named parameters are supported
-* `int` to `float` coercion is allowed
+- wrong scalar types produce `-32602`
+- missing required parameters produce `-32602`
+- unknown named parameters produce `-32602`
+- surplus positional parameters produce `-32602`
+- optional parameters use their defaults when omitted
+- both positional and named parameters are supported
+- `int` to `float` coercion is allowed
+- `RequestContext` is injected automatically when declared as the first method parameter
 
-This keeps handler signatures clean without turning parameter binding into magic.
+This keeps handler signatures clean without turning binding into magic.
 
 ---
 
-## 📚 Documentation Generation
+## 📚 Documentation generation
 
 Generate docs from handler metadata:
 
@@ -307,7 +591,39 @@ php bin/generate-docs.php --format=json --output=docs/api.json
 
 ---
 
-## 🚨 Error Codes
+## 🧪 Examples
+
+### Basic example
+
+A minimal server with handlers and no auth:
+
+- [examples/basic/](examples/basic/)
+
+### Auth example
+
+Shows JWT auth with a working example app:
+
+- [examples/auth/](examples/auth/)
+
+### Advanced example
+
+Shows:
+
+- custom handler factory
+- middleware
+- schema validation
+
+- [examples/advanced/](examples/advanced/)
+
+### Browser demo
+
+A tiny HTML page that lets you send raw JSON-RPC requests and inspect the raw response:
+
+- [examples/browser-demo/](examples/browser-demo/)
+
+---
+
+## 🚨 Error codes
 
 | Code   | Meaning                 | When                                                |
 | ------ | ----------------------- | --------------------------------------------------- |
@@ -315,19 +631,18 @@ php bin/generate-docs.php --format=json --output=docs/api.json
 | -32600 | Invalid Request         | Malformed request, empty body, empty batch          |
 | -32601 | Method not found        | Unknown or reserved method                          |
 | -32602 | Invalid params          | Missing, wrong type, unknown, or surplus parameters |
-| -32603 | Internal error          | Handler exception, serialization failure            |
+| -32603 | Internal error          | Handler or middleware exception, serialization failure |
 | -32000 | Rate limit exceeded     | Too many requests                                   |
-| -32001 | Authentication required | Protected method without valid JWT                  |
+| -32001 | Authentication required | Protected method without valid credentials          |
 | -32099 | Custom server error     | Application-defined                                 |
 
 ### Error handling notes
 
-* `JsonRpcException` subclasses are preserved with their original codes
-* Only unknown `Throwable` maps to `-32603`
-* Debug mode includes stack traces
-* Production mode strips them
-* JSON serialization failures in batch responses are isolated per response:
-  one broken response does not poison the rest of the batch
+- `JsonRpcException` subclasses are preserved with their original codes
+- only unknown `Throwable` maps to `-32603`
+- debug mode includes stack traces
+- production mode strips them
+- JSON serialization failures in batch responses are isolated per response
 
 ---
 
@@ -335,9 +650,13 @@ php bin/generate-docs.php --format=json --output=docs/api.json
 
 See [docs/configuration.md](docs/configuration.md) for the full configuration reference with all keys, defaults, and descriptions.
 
+For architecture details and the request lifecycle, see [docs/architecture.md](docs/architecture.md).
+
+For authentication-specific setup and integration notes, see [docs/authentication.md](docs/authentication.md).
+
 ---
 
-## 🧪 Running Tests
+## 🧪 Running tests
 
 ```bash
 vendor/bin/phpunit
@@ -349,12 +668,14 @@ vendor/bin/phpunit
 
 Security-sensitive behavior includes:
 
-* method execution restricted to public instance methods on the concrete handler class
-* JWT algorithm confusion prevented (`alg` must match config exactly)
-* server refuses to start with auth enabled but empty secret
-* gzip zip bombs mitigated with size limits enforced before and after decompression
-* log injection prevented (newlines escaped, context JSON-encoded)
-* rate limiting uses atomic file locking with configurable fail-open / fail-closed behavior
+- method execution restricted to public instance methods on the concrete handler class
+- reserved `rpc.*` namespace blocked
+- JWT algorithm confusion prevented (`alg` must match config exactly)
+- server refuses to start with invalid auth driver configuration
+- server refuses to start with auth enabled but invalid required auth config
+- gzip bombs mitigated with size limits enforced before and after decompression
+- log injection prevented (newlines escaped, context JSON-encoded)
+- rate limiting uses atomic file locking with configurable fail-open / fail-closed behavior
 
 See [docs/security.md](docs/security.md) for details.
 
@@ -368,8 +689,8 @@ Lumen JSON-RPC is free software licensed under the **GNU Lesser General Public L
 
 The main condition is about the library itself:
 
-* if you distribute a modified version of **Lumen JSON-RPC**,
-* those modifications to the library must remain available under the LGPL.
+- if you distribute a modified version of **Lumen JSON-RPC**,
+- those modifications to the library must remain available under the LGPL.
 
 This is an intentional choice: the goal is to keep the library easy to adopt in real-world PHP projects while ensuring that improvements to the core engine are contributed back when they are distributed.
 

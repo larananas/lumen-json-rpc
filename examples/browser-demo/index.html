@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JSON-RPC Browser Demo</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace; background: #1a1a2e; color: #e0e0e0; padding: 20px; max-width: 900px; margin: 0 auto; }
+h1 { color: #e94560; margin-bottom: 20px; font-size: 1.4em; }
+h2 { color: #0f3460; background: #e94560; padding: 6px 10px; margin: 16px 0 8px; font-size: 0.9em; border-radius: 3px; color: #fff; }
+label { display: block; margin: 8px 0 4px; font-size: 0.85em; color: #a0a0c0; }
+input, textarea { width: 100%; background: #16213e; border: 1px solid #0f3460; color: #e0e0e0; padding: 8px; font-family: monospace; font-size: 0.9em; border-radius: 3px; }
+input:focus, textarea:focus { outline: none; border-color: #e94560; }
+textarea { resize: vertical; min-height: 80px; }
+button { background: #e94560; color: #fff; border: none; padding: 10px 24px; cursor: pointer; font-size: 0.95em; border-radius: 3px; margin-top: 12px; font-family: monospace; }
+button:hover { background: #c73652; }
+pre { background: #16213e; padding: 12px; border-radius: 3px; overflow-x: auto; font-size: 0.85em; border: 1px solid #0f3460; white-space: pre-wrap; word-break: break-all; }
+.row { display: flex; gap: 10px; }
+.row > div { flex: 1; }
+.hint { font-size: 0.75em; color: #606080; margin-top: 2px; }
+</style>
+</head>
+<body>
+<h1>JSON-RPC 2.0 Browser Demo</h1>
+
+<h2>Server Endpoint</h2>
+<label for="endpoint">Endpoint URL</label>
+<input type="text" id="endpoint" value="http://localhost:8000/" placeholder="http://localhost:8000/">
+<p class="hint">Start the server with: php -S localhost:8000 -t examples/basic/public</p>
+
+<h2>Request</h2>
+<div class="row">
+  <div>
+    <label for="method">Method</label>
+    <input type="text" id="method" value="system.health" placeholder="handler.method">
+  </div>
+  <div>
+    <label for="id">Request ID</label>
+    <input type="text" id="id" value="1" placeholder="1">
+  </div>
+</div>
+<label for="params">Params (JSON)</label>
+<textarea id="params" placeholder='{"key": "value"}'></textarea>
+
+<h2>Auth Header (optional)</h2>
+<div class="row">
+  <div>
+    <label for="authName">Header Name</label>
+    <input type="text" id="authName" placeholder="Authorization">
+  </div>
+  <div>
+    <label for="authValue">Header Value</label>
+    <input type="text" id="authValue" placeholder="Bearer token...">
+  </div>
+</div>
+
+<button id="sendBtn">Send</button>
+
+<h2>Sent</h2>
+<pre id="sentOutput">-</pre>
+
+<h2>Response</h2>
+<pre id="responseOutput">-</pre>
+
+<script>
+document.getElementById('sendBtn').addEventListener('click', async () => {
+  const endpoint = document.getElementById('endpoint').value.trim();
+  const method = document.getElementById('method').value.trim();
+  const idVal = document.getElementById('id').value.trim();
+  const paramsStr = document.getElementById('params').value.trim();
+  const authName = document.getElementById('authName').value.trim();
+  const authValue = document.getElementById('authValue').value.trim();
+
+  if (!endpoint || !method) {
+    alert('Endpoint and method are required.');
+    return;
+  }
+
+  const request = { jsonrpc: '2.0', method };
+  if (idVal !== '') request.id = isNaN(idVal) ? idVal : Number(idVal);
+  if (paramsStr) {
+    try { request.params = JSON.parse(paramsStr); }
+    catch (e) { alert('Invalid params JSON: ' + e.message); return; }
+  }
+
+  const sentPre = document.getElementById('sentOutput');
+  const resPre = document.getElementById('responseOutput');
+  sentPre.textContent = JSON.stringify(request, null, 2);
+  resPre.textContent = 'Sending...';
+
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (authName && authValue) headers[authName] = authValue;
+
+    const resp = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(request),
+    });
+
+    const text = await resp.text();
+    if (!text) {
+      resPre.textContent = `HTTP ${resp.status} No Content (notification acknowledged)`;
+      return;
+    }
+    try {
+      resPre.textContent = JSON.stringify(JSON.parse(text), null, 2);
+    } catch {
+      resPre.textContent = text;
+    }
+  } catch (e) {
+    resPre.textContent = 'Error: ' + e.message;
+  }
+});
+</script>
+</body>
+</html>

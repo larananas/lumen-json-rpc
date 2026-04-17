@@ -21,7 +21,7 @@ final class HandlerDispatcherErrorMappingTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->handlerPath = realpath(__DIR__ . '/../../../examples/handlers') ?: __DIR__ . '/../../../examples/handlers';
+        $this->handlerPath = realpath(__DIR__ . '/../../../examples/basic/handlers') ?: __DIR__ . '/../../../examples/basic/handlers';
         $this->fixturePath = realpath(__DIR__ . '/../../../tests/Fixtures') ?: __DIR__ . '/../../../tests/Fixtures';
     }
 

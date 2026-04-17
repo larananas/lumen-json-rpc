@@ -20,6 +20,9 @@ final class RequestReader
         }
 
         if ($this->requestGzipEnabled && $request->isGzipped()) {
+            if (!function_exists('gzdecode')) {
+                return '';
+            }
             $decoded = @gzdecode($body);
             if ($decoded === false) {
                 return '';

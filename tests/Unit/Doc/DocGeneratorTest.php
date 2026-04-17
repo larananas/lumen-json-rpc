@@ -17,7 +17,7 @@ final class DocGeneratorTest extends TestCase
 
     protected function setUp(): void
     {
-        $handlerPath = realpath(__DIR__ . '/../../../examples/handlers') ?: __DIR__ . '/../../../examples/handlers';
+        $handlerPath = realpath(__DIR__ . '/../../../examples/basic/handlers') ?: __DIR__ . '/../../../examples/basic/handlers';
         $registry = new HandlerRegistry(
             [$handlerPath],
             'App\\Handlers\\',

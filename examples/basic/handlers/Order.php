@@ -4,18 +4,11 @@ declare(strict_types=1);
 
 namespace App\Handlers;
 
-use Lumen\JsonRpc\Support\RequestContext;
-
 /**
  * Order management handler.
- * @requiresAuth
  */
 class Order
 {
-    public function __construct(
-        private readonly RequestContext $context,
-    ) {}
-
     /**
      * Create a new order.
      *
@@ -26,7 +19,7 @@ class Order
      * @example-request {"jsonrpc": "2.0", "method": "order.create", "params": {"product": "Widget", "quantity": 5, "price": 9.99}, "id": 1}
      * @example-response {"id": 1001, "product": "Widget", "quantity": 5, "total": 49.95}
      */
-    public function create(RequestContext $context, string $product, int $quantity, float $price = 0.0): array
+    public function create(string $product, int $quantity, float $price = 0.0): array
     {
         return [
             'id' => random_int(1000, 9999),
@@ -44,7 +37,7 @@ class Order
      * @example-request {"jsonrpc": "2.0", "method": "order.get", "params": [1001], "id": 2}
      * @example-response {"id": 1001, "product": "Widget", "quantity": 5, "total": 49.95}
      */
-    public function get(RequestContext $context, int $id): array
+    public function get(int $id): array
     {
         return [
             'id' => $id,
@@ -63,7 +56,7 @@ class Order
      * @example-request {"jsonrpc": "2.0", "method": "order.list", "params": {"limit": 20}, "id": 3}
      * @example-response {"orders": [], "total": 0}
      */
-    public function list(RequestContext $context, int $limit = 20, int $offset = 0): array
+    public function list(int $limit = 20, int $offset = 0): array
     {
         return [
             'orders' => [],

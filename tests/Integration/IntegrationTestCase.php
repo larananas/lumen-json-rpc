@@ -14,7 +14,7 @@ trait IntegrationTestCase
 
     private function initHandlerPath(): void
     {
-        $this->handlerPath = realpath(__DIR__ . '/../../examples/handlers') ?: __DIR__ . '/../../examples/handlers';
+        $this->handlerPath = realpath(__DIR__ . '/../../examples/basic/handlers') ?: __DIR__ . '/../../examples/basic/handlers';
     }
 
     private function createServer(array $overrides = []): JsonRpcServer

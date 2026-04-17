@@ -10,13 +10,14 @@ final class Defaults
     {
         return [
             'handlers' => [
-                'paths' => [],
+                'paths' => [__DIR__ . '/../../handlers'],
                 'namespace' => 'App\\Handlers\\',
                 'method_separator' => '.',
             ],
             'auth' => [
                 'enabled' => false,
-                'protected_methods' => [],
+                'driver' => 'jwt',
+                'protected_methods' => ['user.', 'order.'],
                 'jwt' => [
                     'secret' => '',
                     'algorithm' => 'HS256',
@@ -25,6 +26,14 @@ final class Defaults
                     'issuer' => '',
                     'audience' => '',
                     'leeway' => 0,
+                ],
+                'api_key' => [
+                    'header' => 'X-API-Key',
+                    'keys' => [],
+                ],
+                'basic' => [
+                    'header' => 'Authorization',
+                    'users' => [],
                 ],
             ],
             'batch' => [
@@ -37,7 +46,8 @@ final class Defaults
             'logging' => [
                 'enabled' => true,
                 'level' => 'info',
-                'path' => 'logs/app.log',
+                'path' => __DIR__ . '/../../logs/app.log',
+                'format' => 'text',
                 'sanitize_secrets' => true,
             ],
             'log_rotation' => [
@@ -55,7 +65,7 @@ final class Defaults
                 'max_requests' => 100,
                 'window_seconds' => 60,
                 'strategy' => 'ip',
-                'storage_path' => 'storage/rate_limit',
+                'storage_path' => __DIR__ . '/../../storage/rate_limit',
                 'batch_weight' => 1,
                 'fail_open' => true,
             ],
@@ -68,11 +78,15 @@ final class Defaults
                 'enabled' => false,
                 'algorithm' => 'sha256',
             ],
+
             'health' => [
                 'enabled' => true,
             ],
             'validation' => [
                 'strict' => true,
+                'schema' => [
+                    'enabled' => false,
+                ],
             ],
             'content_type' => [
                 'strict' => false,

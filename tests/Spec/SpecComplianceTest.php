@@ -16,7 +16,7 @@ final class SpecComplianceTest extends TestCase
 
     protected function setUp(): void
     {
-        $handlerPath = realpath(__DIR__ . '/../../examples/handlers') ?: __DIR__ . '/../../examples/handlers';
+        $handlerPath = realpath(__DIR__ . '/../../examples/basic/handlers') ?: __DIR__ . '/../../examples/basic/handlers';
         $config = new Config([
             'handlers' => [
                 'paths' => [$handlerPath],

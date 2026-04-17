@@ -19,7 +19,7 @@ final class HandlerDispatcherTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->handlerPath = realpath(__DIR__ . '/../../../examples/handlers') ?: __DIR__ . '/../../../examples/handlers';
+        $this->handlerPath = realpath(__DIR__ . '/../../../examples/basic/handlers') ?: __DIR__ . '/../../../examples/basic/handlers';
     }
 
     public function testDispatchWithRequestContextConstructor(): void

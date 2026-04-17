@@ -16,11 +16,18 @@ use Throwable;
 
 final class HandlerDispatcher
 {
+    private ?HandlerFactoryInterface $factory = null;
+
     public function __construct(
         private readonly MethodResolver $resolver,
         private readonly ParameterBinder $parameterBinder,
         private readonly ?HandlerRegistry $registry = null,
     ) {}
+
+    public function setFactory(HandlerFactoryInterface $factory): void
+    {
+        $this->factory = $factory;
+    }
 
     public function dispatch(Request $request, RequestContext $context): mixed
     {
@@ -73,6 +80,23 @@ final class HandlerDispatcher
         }
     }
 
+    public function resolveMethod(string $method): ?MethodResolution
+    {
+        $resolution = $this->resolver->resolve($method);
+        if ($resolution === null) {
+            return null;
+        }
+
+        if ($this->registry !== null) {
+            $handlers = $this->registry->getHandlers();
+            if (!isset($handlers[$method])) {
+                return null;
+            }
+        }
+
+        return $resolution;
+    }
+
     private function validateMethod(ReflectionMethod $method, string $name): void
     {
         if (!$method->isPublic()) {
@@ -95,45 +119,8 @@ final class HandlerDispatcher
 
     private function createInstance(string $className, RequestContext $context): object
     {
-        $reflection = new ReflectionClass($className);
-
-        $constructor = $reflection->getConstructor();
-        if ($constructor === null) {
-            // No constructor, can instantiate without arguments
-            $instance = $reflection->newInstance();
-        } else {
-            $params = $constructor->getParameters();
-
-            if ($params === []) {
-                // Constructor exists but has no parameters
-                $instance = $reflection->newInstance();
-            } else {
-                $firstParam = $params[0];
-                $firstParamType = $firstParam->getType();
-
-                // Check if first parameter accepts RequestContext
-                if ($firstParamType instanceof \ReflectionNamedType) {
-                    $typeName = $firstParamType->getName();
-                    if ($typeName === RequestContext::class || is_a($typeName, RequestContext::class, true)) {
-                        $instance = $reflection->newInstance($context);
-                    } elseif ($firstParam->isOptional()) {
-                        // First param is not RequestContext but is optional, try without args
-                        $instance = $reflection->newInstance();
-                    } else {
-                        throw new MethodNotFoundException(
-                            "Handler class '{$className}' constructor is not compatible with required signature"
-                        );
-                    }
-                } elseif ($firstParam->isOptional()) {
-                    // No type hint on first param, but it's optional
-                    $instance = $reflection->newInstance();
-                } else {
-                    throw new MethodNotFoundException(
-                        "Handler class '{$className}' constructor is not compatible with required signature"
-                    );
-                }
-            }
-        }
+        $factory = $this->factory ?? new DefaultHandlerFactory();
+        $instance = $factory->create($className, $context);
 
         if ($this->registry !== null && method_exists($instance, 'setRegistry')) {
             $instance->setRegistry($this->registry);

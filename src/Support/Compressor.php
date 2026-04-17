@@ -6,9 +6,23 @@ namespace Lumen\JsonRpc\Support;
 
 final class Compressor
 {
+    private static ?bool $zlibAvailable = null;
+
+    public static function isZlibAvailable(): bool
+    {
+        if (self::$zlibAvailable === null) {
+            self::$zlibAvailable = function_exists('gzdecode') && function_exists('gzencode');
+        }
+        return self::$zlibAvailable;
+    }
+
     public static function decodeGzip(string $data): ?string
     {
         if ($data === '') {
+            return null;
+        }
+
+        if (!self::isZlibAvailable()) {
             return null;
         }
 
@@ -18,6 +32,10 @@ final class Compressor
 
     public static function encodeGzip(string $data): ?string
     {
+        if (!self::isZlibAvailable()) {
+            return null;
+        }
+
         $encoded = @gzencode($data, 6);
         return $encoded !== false ? $encoded : null;
     }

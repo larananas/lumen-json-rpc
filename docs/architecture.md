@@ -12,23 +12,32 @@
 
 ```
 HTTP Request
+  -> JsonRpcServer (HTTP facade)
   -> RequestReader (body extraction, gzip decoding, size limit)
-  -> JSON Decode (with depth limit)
-  -> BatchProcessor (detect single vs batch, validate structure)
-  -> AuthManager (extract JWT, authenticate, build UserContext)
-  -> RateLimitManager (check rate limits)
-  -> For each request:
-     -> HookManager (fire BEFORE_HANDLER)
-     -> MethodResolver (map method name to handler class+method)
-     -> HandlerDispatcher (instantiate handler, invoke method)
-     -> ParameterBinder (bind params to method arguments)
-     -> HookManager (fire AFTER_HANDLER)
-  -> Response building (success or error)
-  -> HookManager (fire ON_RESPONSE)
-  -> HttpResponse (JSON encode, optional ETag)
+  -> JsonRpcEngine (core, transport-agnostic)
+     -> JSON Decode (with depth limit)
+     -> BatchProcessor (detect single vs batch, validate structure)
+     -> AuthManager + RequestAuthenticator (extract credentials, authenticate, build UserContext)
+     -> RateLimitManager (check rate limits)
+     -> For each request:
+        -> MiddlewarePipeline (execute middleware stack)
+        -> SchemaValidator (optional, if handler provides schemas)
+        -> HookManager (fire BEFORE_HANDLER)
+        -> MethodResolver (map method name to handler class+method)
+        -> HandlerDispatcher + HandlerFactory (instantiate handler, invoke method)
+        -> ParameterBinder (bind params to method arguments)
+        -> HookManager (fire AFTER_HANDLER)
+     -> Response building (success or error)
+     -> HookManager (fire ON_RESPONSE)
+  -> HttpResponse (JSON encode, optional ETag, optional gzip)
 ```
 
 ## Component Responsibilities
+
+### Core (`src/Core/`)
+
+- `JsonRpcEngine`: Transport-agnostic JSON-RPC processing engine (decode, dispatch, auth, rate limit, middleware, hooks)
+- `EngineResult`: Value object for engine output (JSON string or null, status code, headers)
 
 ### Config (`src/Config/`)
 
@@ -57,11 +66,35 @@ HTTP Request
 - `ParameterBinder`: Binds positional or named params to method arguments
 - `HandlerRegistry`: Discovers all available handlers and methods
 
+### Dispatcher (`src/Dispatcher/`)
+
+- `MethodResolver`: Maps `handler.method` to class file + method name safely
+- `HandlerDispatcher`: Creates handler instances and invokes methods
+- `HandlerFactoryInterface`: Contract for custom handler instantiation (DI)
+- `DefaultHandlerFactory`: Default factory (RequestContext injection, optional params)
+- `ParameterBinder`: Binds positional or named params to method arguments
+- `HandlerRegistry`: Discovers all available handlers and methods
+
 ### Auth (`src/Auth/`)
 
 - `AuthManager`: Orchestrates authentication (enabled/disabled, token extraction)
-- `JwtAuthenticator`: Decodes and validates JWT tokens
+- `AuthenticatorInterface`: Low-level token validator contract
+- `JwtAuthenticator`: Decodes and validates JWT tokens (HMAC)
+- `RequestAuthenticatorInterface`: Driver-level auth from HTTP headers
+- `JwtRequestAuthenticator`: JWT driver (extracts Bearer token from header)
+- `ApiKeyAuthenticator`: API key driver (reads key from configurable header)
+- `BasicAuthenticator`: HTTP Basic driver (username/password from Authorization header)
 - `UserContext`: Immutable authenticated user context with roles
+
+### Middleware (`src/Middleware/`)
+
+- `MiddlewareInterface`: Contract for request middleware
+- `MiddlewarePipeline`: Ordered middleware execution with short-circuit support
+
+### Validation (`src/Validation/`)
+
+- `RpcSchemaProviderInterface`: Contract for handlers declaring parameter schemas
+- `SchemaValidator`: Lightweight JSON Schema subset validator
 
 ### RateLimit (`src/RateLimit/`)
 
@@ -117,6 +150,33 @@ In production mode (`debug: false`), stack traces and internal details are strip
 JSON serialization failures in response encoding are handled per-response: each response is encoded independently so one unserializable result does not affect other responses in a batch. A single failed response becomes a `-32603` error, while other batch responses remain intact.
 
 ## Extension Points
+
+### Custom Handler Factory (DI)
+
+```php
+$server->setHandlerFactory(new class implements \Lumen\JsonRpc\Dispatcher\HandlerFactoryInterface {
+    public function create(string $className, \Lumen\JsonRpc\Support\RequestContext $context): object {
+        // inject dependencies before returning the handler instance
+    }
+});
+```
+
+### Middleware
+
+```php
+$server->addMiddleware(new class implements \Lumen\JsonRpc\Middleware\MiddlewareInterface {
+    public function process(
+        \Lumen\JsonRpc\Protocol\Request $request,
+        \Lumen\JsonRpc\Support\RequestContext $context,
+        callable $next
+    ): ?\Lumen\JsonRpc\Protocol\Response {
+        // pre-processing
+        $response = $next($request, $context);
+        // post-processing
+        return $response;
+    }
+});
+```
 
 ### Custom Authenticator
 

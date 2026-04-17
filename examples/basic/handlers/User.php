@@ -4,18 +4,12 @@ declare(strict_types=1);
 
 namespace App\Handlers;
 
-use Lumen\JsonRpc\Support\RequestContext;
-
 /**
  * User management handler.
  * @requiresAuth
  */
 class User
 {
-    public function __construct(
-        private readonly RequestContext $context,
-    ) {}
-
     /**
      * Create a new user.
      *
@@ -26,7 +20,7 @@ class User
      * @example-request {"jsonrpc": "2.0", "method": "user.create", "params": {"name": "John", "email": "john@example.com"}, "id": 1}
      * @example-response {"id": 1, "name": "John", "email": "john@example.com"}
      */
-    public function create(RequestContext $context, string $name, string $email): array
+    public function create(string $name, string $email): array
     {
         return [
             'id' => random_int(1, 999999),
@@ -44,7 +38,7 @@ class User
      * @example-request {"jsonrpc": "2.0", "method": "user.get", "params": {"id": 1}, "id": 2}
      * @example-response {"id": 1, "name": "John Doe", "email": "john@example.com"}
      */
-    public function get(RequestContext $context, int $id): array
+    public function get(int $id): array
     {
         return [
             'id' => $id,
@@ -62,7 +56,7 @@ class User
      * @example-request {"jsonrpc": "2.0", "method": "user.list", "params": {"limit": 10, "offset": 0}, "id": 3}
      * @example-response {"users": [], "total": 0, "limit": 10, "offset": 0}
      */
-    public function list(RequestContext $context, int $limit = 10, int $offset = 0): array
+    public function list(int $limit = 10, int $offset = 0): array
     {
         return [
             'users' => [],
@@ -80,7 +74,7 @@ class User
      * @example-request {"jsonrpc": "2.0", "method": "user.delete", "params": {"id": 1}, "id": 4}
      * @example-response {"deleted": true}
      */
-    public function delete(RequestContext $context, int $id): array
+    public function delete(int $id): array
     {
         return ['deleted' => true];
     }

@@ -16,7 +16,7 @@ final class ServerIntegrationTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->handlerPath = realpath(__DIR__ . '/../../examples/handlers') ?: __DIR__ . '/../../examples/handlers';
+        $this->handlerPath = realpath(__DIR__ . '/../../examples/basic/handlers') ?: __DIR__ . '/../../examples/basic/handlers';
         $config = new Config([
             'handlers' => [
                 'paths' => [$this->handlerPath],

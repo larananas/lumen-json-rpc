@@ -31,7 +31,7 @@ return [
     'logging' => [
         'enabled' => true,
         'level' => 'info',
-        'path' => __DIR__ . '/../logs/app.log',
+        'path' => __DIR__ . '/../../logs/app.log',
         'sanitize_secrets' => true,
     ],
     'log_rotation' => [
@@ -49,7 +49,7 @@ return [
         'max_requests' => 100,
         'window_seconds' => 60,
         'strategy' => 'ip',
-        'storage_path' => __DIR__ . '/../storage/rate_limit',
+        'storage_path' => __DIR__ . '/../../storage/rate_limit',
         'batch_weight' => 1,
         'fail_open' => true,
     ],

@@ -10,6 +10,7 @@ composer.lock
 
 # Local development artifacts
 /.ai
+/CHANGELOG.md
 
 # Runtime / generated files
 /logs/
