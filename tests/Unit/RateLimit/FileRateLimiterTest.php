@@ -96,10 +96,12 @@ final class FileRateLimiterTest extends TestCase
     $limiter = new FileRateLimiter(
       10,
       60,
-      sys_get_temp_dir() . "/nonexistent_deep_" . uniqid() . "/nested",
+      "/nonexistent/path/that/cannot/be/created/" . uniqid(),
       failOpen: true,
     );
-    $result = $limiter->check("fail-open-test");
+
+    $result = @$limiter->check("fail-open-test");
+
     $this->assertTrue($result->allowed);
   }
 
@@ -118,7 +120,7 @@ final class FileRateLimiterTest extends TestCase
     chmod($subdir, 0555);
 
     $limiter = new FileRateLimiter(10, 60, $subdir . "/deep", failOpen: false);
-    $result = $limiter->check("fail-closed-test");
+    $result = @$limiter->check("fail-closed-test");
 
     chmod($subdir, 0755);
     @rmdir($subdir . "/deep");
