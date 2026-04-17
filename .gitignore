@@ -1,0 +1,19 @@
+# Dependencies
+/vendor/
+
+# CI / test artifacts
+.phpunit.result.cache
+.phpcs-cache
+
+# Lock file (library — consumers resolve their own versions)
+composer.lock
+
+# Local development artifacts
+/.ai
+
+# Runtime / generated files
+/logs/
+/storage/
+/docs/api/
+*.gz
+*.bak
