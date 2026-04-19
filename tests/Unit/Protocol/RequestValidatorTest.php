@@ -175,4 +175,11 @@ final class RequestValidatorTest extends TestCase
         $request = new Request('test.method', 1, null, true, '2.0');
         $this->assertNull($this->validator->validateRequest($request));
     }
+
+    public function testNonStrictModeAllowsExtraMembers(): void
+    {
+        $validator = new RequestValidator(strict: false);
+        $data = ['jsonrpc' => '2.0', 'method' => 'test', 'id' => 1, 'extra' => 'value'];
+        $this->assertNull($validator->validateArray($data));
+    }
 }

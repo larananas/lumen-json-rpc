@@ -112,4 +112,45 @@ final class BatchProcessorTest extends TestCase
         $this->assertEquals(-32600, $result->errors[0]->error->code);
         $this->assertEquals(42, $result->errors[0]->id);
     }
+
+    public function testRawIsObjectWithEmptyArrayTreatedAsSingleRequest(): void
+    {
+        $result = $this->processor->process([], rawIsObject: true);
+        $this->assertFalse($result->isBatch);
+        $this->assertTrue($result->hasErrors());
+        $this->assertEquals(-32600, $result->errors[0]->error->code);
+    }
+
+    public function testRawIsObjectWithSequentialArrayTreatedAsSingleRequest(): void
+    {
+        $data = [
+            'jsonrpc' => '2.0',
+            'method' => 'test.method',
+            'id' => 1,
+        ];
+        $result = $this->processor->process($data, rawIsObject: true);
+        $this->assertFalse($result->isBatch);
+        $this->assertTrue($result->hasRequests());
+        $this->assertCount(1, $result->requests);
+        $this->assertEquals('test.method', $result->requests[0]->method);
+    }
+
+    public function testHasOnlyNotificationsReturnsFalseForMixedBatch(): void
+    {
+        $data = [
+            ['jsonrpc' => '2.0', 'method' => 'notify_a'],
+            ['jsonrpc' => '2.0', 'method' => 'call_b', 'id' => 2],
+        ];
+        $result = $this->processor->process($data);
+        $this->assertTrue($result->isBatch);
+        $this->assertFalse($result->hasOnlyNotifications());
+    }
+
+    public function testHasOnlyNotificationsReturnsFalseForNoRequests(): void
+    {
+        $data = [1, 2, 3];
+        $result = $this->processor->process($data);
+        $this->assertTrue($result->isBatch);
+        $this->assertFalse($result->hasOnlyNotifications());
+    }
 }
