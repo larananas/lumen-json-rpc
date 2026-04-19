@@ -54,4 +54,33 @@ final class DefaultHandlerFactoryTest extends TestCase
         $this->expectExceptionMessage('constructor is not compatible');
         $factory->create(HandlerIncompatible::class, $this->context);
     }
+
+    public function testUnionTypeOptionalParamCreatesInstance(): void
+    {
+        $factory = new DefaultHandlerFactory();
+        $instance = $factory->create(HandlerUnionTypeOptional::class, $this->context);
+        $this->assertInstanceOf(HandlerUnionTypeOptional::class, $instance);
+    }
+
+    public function testUnionTypeRequiredParamThrowsException(): void
+    {
+        $factory = new DefaultHandlerFactory();
+        $this->expectException(MethodNotFoundException::class);
+        $this->expectExceptionMessage('constructor is not compatible');
+        $factory->create(HandlerUnionTypeRequired::class, $this->context);
+    }
+}
+
+final class HandlerUnionTypeOptional
+{
+    public function __construct(
+        private readonly string|int $value = 'default',
+    ) {}
+}
+
+final class HandlerUnionTypeRequired
+{
+    public function __construct(
+        private readonly string|int $value,
+    ) {}
 }

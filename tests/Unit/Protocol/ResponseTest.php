@@ -59,4 +59,15 @@ final class ResponseTest extends TestCase
         $this->assertNull($arr['id']);
         $this->assertEquals(-32600, $arr['error']['code']);
     }
+
+    public function testToJsonFallbackOnEncodingFailure(): void
+    {
+        $response = Response::success(1, ['value' => INF]);
+        $json = $response->toJson();
+        $decoded = json_decode($json, true);
+        $this->assertNotNull($decoded);
+        $this->assertEquals(-32603, $decoded['error']['code']);
+        $this->assertStringContainsString('Internal error', $decoded['error']['message']);
+        $this->assertEquals(1, $decoded['id']);
+    }
 }

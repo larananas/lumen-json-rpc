@@ -74,4 +74,56 @@ final class RequestTest extends TestCase
         $arr = $request->toArray();
         $this->assertArrayNotHasKey('params', $arr);
     }
+
+    public function testSanitizeIdReturnsNullForFloat(): void
+    {
+        $this->assertNull(Request::sanitizeId(3.14));
+    }
+
+    public function testSanitizeIdReturnsNullForBool(): void
+    {
+        $this->assertNull(Request::sanitizeId(true));
+    }
+
+    public function testSanitizeIdReturnsNullForArray(): void
+    {
+        $this->assertNull(Request::sanitizeId([1, 2]));
+    }
+
+    public function testSanitizeIdPassesThroughNull(): void
+    {
+        $this->assertNull(Request::sanitizeId(null));
+    }
+
+    public function testSanitizeIdPassesThroughString(): void
+    {
+        $this->assertSame('abc', Request::sanitizeId('abc'));
+    }
+
+    public function testSanitizeIdPassesThroughInt(): void
+    {
+        $this->assertSame(42, Request::sanitizeId(42));
+    }
+
+    public function testFromArrayConvertsNonArrayParamsToNull(): void
+    {
+        $data = [
+            'jsonrpc' => '2.0',
+            'method' => 'test',
+            'params' => 'not-an-array',
+            'id' => 1,
+        ];
+        $request = Request::fromArray($data);
+        $this->assertNull($request->params);
+    }
+
+    public function testFromArrayDefaultsEmptyMethodAndJsonrpc(): void
+    {
+        $data = [];
+        $request = Request::fromArray($data);
+        $this->assertSame('', $request->method);
+        $this->assertSame('', $request->jsonrpc);
+        $this->assertNull($request->id);
+        $this->assertNull($request->params);
+    }
 }

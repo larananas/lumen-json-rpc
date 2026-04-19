@@ -153,4 +153,26 @@ final class RequestValidatorTest extends TestCase
         $data = ['jsonrpc' => '2.0', 'method' => $method, 'id' => 1];
         $this->assertNull($this->validator->validateArray($data));
     }
+
+    public function testValidateRequestInvalidJsonrpc(): void
+    {
+        $request = new Request('test.method', 1, null, true, '1.0');
+        $error = $this->validator->validateRequest($request);
+        $this->assertNotNull($error);
+        $this->assertEquals(-32600, $error->code);
+    }
+
+    public function testValidateRequestEmptyMethod(): void
+    {
+        $request = new Request('', 1, null, true, '2.0');
+        $error = $this->validator->validateRequest($request);
+        $this->assertNotNull($error);
+        $this->assertEquals(-32600, $error->code);
+    }
+
+    public function testValidateRequestValidReturnsNull(): void
+    {
+        $request = new Request('test.method', 1, null, true, '2.0');
+        $this->assertNull($this->validator->validateRequest($request));
+    }
 }
