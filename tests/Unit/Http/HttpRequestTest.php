@@ -70,4 +70,16 @@ final class HttpRequestTest extends TestCase
     {
         $this->assertFalse($this->request->isGzipped());
     }
+
+    public function testGetHeaderCaseInsensitiveFindsMatch(): void
+    {
+        $this->assertSame('application/json', $this->request->getHeaderCaseInsensitive('content-type'));
+        $this->assertSame('application/json', $this->request->getHeaderCaseInsensitive('CONTENT-TYPE'));
+        $this->assertSame('Bearer token123', $this->request->getHeaderCaseInsensitive('authorization'));
+    }
+
+    public function testGetHeaderCaseInsensitiveReturnsNullForMissing(): void
+    {
+        $this->assertNull($this->request->getHeaderCaseInsensitive('x-nonexistent'));
+    }
 }
