@@ -1,0 +1,10 @@
+parameters:
+    level: 8
+    paths:
+        - src
+        - bin
+    excludePaths:
+        - vendor
+    reportUnmatchedIgnoredErrors: true
+    ignoreErrors:
+        - '#Instantiated class Firebase\\JWT\\Key not found#'
