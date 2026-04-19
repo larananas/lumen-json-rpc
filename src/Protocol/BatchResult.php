@@ -4,8 +4,15 @@ declare(strict_types=1);
 
 namespace Lumen\JsonRpc\Protocol;
 
+/**
+ * @internal
+ */
 final class BatchResult
 {
+    /**
+     * @param array<int, Request> $requests
+     * @param array<int, Response> $errors
+     */
     public function __construct(
         public readonly array $requests,
         public readonly array $errors,

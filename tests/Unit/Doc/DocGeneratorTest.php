@@ -15,15 +15,18 @@ final class DocGeneratorTest extends TestCase
 {
     private DocGenerator $generator;
 
+    private HandlerRegistry $registry;
+
     protected function setUp(): void
     {
         $handlerPath = realpath(__DIR__ . '/../../../examples/basic/handlers') ?: __DIR__ . '/../../../examples/basic/handlers';
-        $registry = new HandlerRegistry(
+        $this->registry = new HandlerRegistry(
             [$handlerPath],
             'App\\Handlers\\',
             '.',
         );
-        $this->generator = new DocGenerator($registry);
+        $this->registry->discover();
+        $this->generator = new DocGenerator($this->registry);
     }
 
     public function testGeneratesDocsForAllMethods(): void

@@ -6,12 +6,18 @@ namespace Lumen\JsonRpc\Http;
 
 final class HttpResponse
 {
+    /**
+     * @param array<string, string> $headers
+     */
     public function __construct(
         public readonly string $body,
         public readonly int $statusCode = 200,
         public readonly array $headers = [],
     ) {}
 
+    /**
+     * @param array<string, string> $extraHeaders
+     */
     public static function json(string $json, int $statusCode = 200, array $extraHeaders = []): self
     {
         return new self(

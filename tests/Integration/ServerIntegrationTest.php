@@ -197,7 +197,7 @@ final class ServerIntegrationTest extends TestCase
         ]);
         $response = $this->server->handle($this->createRequest($body));
         $data = json_decode($response->body, true);
-        $this->assertEquals(-32601, $data['error']['code']);
+        $this->assertEquals(-32600, $data['error']['code']);
     }
 
     public function testResponseHasNoResultAndErrorSimultaneously(): void

@@ -8,9 +8,12 @@ final class Request
 {
     public readonly bool $isNotification;
 
+    /**
+     * @param array<string, mixed>|array<int, mixed>|null $params
+     */
     public function __construct(
         public readonly string $method,
-        public readonly string|int|float|null $id,
+        public readonly string|int|null $id,
         public readonly array|null $params,
         public readonly bool $idProvided,
         public readonly string $jsonrpc = '2.0',
@@ -18,6 +21,9 @@ final class Request
         $this->isNotification = !$idProvided;
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public static function fromArray(array $data): self
     {
         $params = array_key_exists('params', $data) ? $data['params'] : null;
@@ -37,14 +43,17 @@ final class Request
         );
     }
 
-    public static function sanitizeId(mixed $id): string|int|float|null
+    public static function sanitizeId(mixed $id): string|int|null
     {
-        if ($id === null || is_string($id) || is_int($id) || is_float($id)) {
+        if ($id === null || is_string($id) || is_int($id)) {
             return $id;
         }
         return null;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
         $arr = [

@@ -6,10 +6,14 @@ namespace Lumen\JsonRpc\Dispatcher;
 
 final class MethodResolver
 {
+    /** @var array<int, string> */
     private array $handlerPaths;
     private string $namespace;
     private string $separator;
 
+    /**
+     * @param array<int, string> $handlerPaths
+     */
     public function __construct(array $handlerPaths, string $namespace, string $separator = '.')
     {
         $this->handlerPaths = $handlerPaths;
@@ -23,7 +27,7 @@ final class MethodResolver
             return null;
         }
 
-        $parts = explode($this->separator, $method);
+        $parts = explode($this->separator !== '' ? $this->separator : '.', $method);
         if (count($parts) < 2) {
             return null;
         }

@@ -23,26 +23,41 @@ final class Logger
         $this->silent = ($logPath === '' || $this->minLevel === LogLevel::NONE);
     }
 
+    /**
+     * @param array<string, mixed> $context
+     */
     public function debug(string $message, array $context = [], ?string $correlationId = null): void
     {
         $this->log(LogLevel::DEBUG, $message, $context, $correlationId);
     }
 
+    /**
+     * @param array<string, mixed> $context
+     */
     public function info(string $message, array $context = [], ?string $correlationId = null): void
     {
         $this->log(LogLevel::INFO, $message, $context, $correlationId);
     }
 
+    /**
+     * @param array<string, mixed> $context
+     */
     public function warning(string $message, array $context = [], ?string $correlationId = null): void
     {
         $this->log(LogLevel::WARNING, $message, $context, $correlationId);
     }
 
+    /**
+     * @param array<string, mixed> $context
+     */
     public function error(string $message, array $context = [], ?string $correlationId = null): void
     {
         $this->log(LogLevel::ERROR, $message, $context, $correlationId);
     }
 
+    /**
+     * @param array<string, mixed> $context
+     */
     private function log(LogLevel $level, string $message, array $context, ?string $correlationId): void
     {
         if ($this->silent) {

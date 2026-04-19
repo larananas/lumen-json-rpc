@@ -13,6 +13,10 @@ use ReflectionUnionType;
 
 final class ParameterBinder
 {
+    /**
+     * @param array<string, mixed>|array<int, mixed>|null $params
+     * @return array<int, mixed>
+     */
     public function bind(ReflectionMethod $method, array|null $params, RequestContext $context): array
     {
         $parameters = $method->getParameters();
@@ -53,9 +57,11 @@ final class ParameterBinder
             }
         }
 
+        $namedParams = array_combine(array_map('strval', array_keys($params)), $params) ?: [];
+
         foreach ($parameters as $position => $param) {
             if ($isAssoc) {
-                $args[] = $this->bindNamed($param, $params);
+                $args[] = $this->bindNamed($param, $namedParams);
             } else {
                 $args[] = $this->bindPositional($param, $params, $position);
             }
@@ -64,6 +70,9 @@ final class ParameterBinder
         return $args;
     }
 
+    /**
+     * @param array<string, mixed> $params
+     */
     private function bindNamed(ReflectionParameter $param, array $params): mixed
     {
         $name = $param->getName();
@@ -83,6 +92,9 @@ final class ParameterBinder
         throw new InvalidParamsException("Missing parameter: $name");
     }
 
+    /**
+     * @param array<int|string, mixed> $params
+     */
     private function bindPositional(ReflectionParameter $param, array $params, int $position): mixed
     {
         if (array_key_exists($position, $params)) {
@@ -150,6 +162,9 @@ final class ParameterBinder
         return $value;
     }
 
+    /**
+     * @param array<string, mixed>|array<int, mixed> $arr
+     */
     private function isAssociative(array $arr): bool
     {
         if (empty($arr)) {

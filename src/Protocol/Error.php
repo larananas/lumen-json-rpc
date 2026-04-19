@@ -37,6 +37,9 @@ final class Error
         return new self(-32603, 'Internal error', $detail);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
         $arr = [

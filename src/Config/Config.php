@@ -6,8 +6,12 @@ namespace Lumen\JsonRpc\Config;
 
 class Config
 {
+    /** @var array<string, mixed> */
     private array $data;
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public function __construct(array $data = [])
     {
         $this->data = array_replace_recursive(Defaults::all(), $data);
@@ -54,6 +58,9 @@ class Config
         }
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function all(): array
     {
         return $this->data;

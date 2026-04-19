@@ -6,6 +6,10 @@ namespace Lumen\JsonRpc\Auth;
 
 final class UserContext
 {
+    /**
+     * @param array<string, mixed> $claims
+     * @param array<int, string> $roles
+     */
     public function __construct(
         public readonly string $userId,
         public readonly array $claims = [],

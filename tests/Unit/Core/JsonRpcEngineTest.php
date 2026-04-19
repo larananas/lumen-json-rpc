@@ -65,7 +65,7 @@ final class JsonRpcEngineTest extends TestCase
 
         return new JsonRpcEngine(
             $config, $logger, $hooks, $authManager, $rateLimitManager,
-            $fingerprinter, $validator, $batchProcessor, $dispatcher, $registry,
+            $fingerprinter, $batchProcessor, $dispatcher, $registry,
         );
     }
 

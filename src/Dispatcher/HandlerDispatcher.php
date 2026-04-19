@@ -31,17 +31,26 @@ final class HandlerDispatcher
 
     public function dispatch(Request $request, RequestContext $context): mixed
     {
+        $registryEntry = null;
+        if ($this->registry !== null) {
+            $handlers = $this->registry->getHandlers();
+            if (isset($handlers[$request->method])) {
+                $registryEntry = $handlers[$request->method];
+            }
+        }
+
+        if ($registryEntry !== null && ($registryEntry['descriptor'] ?? false) === true) {
+            return $this->dispatchDescriptor($registryEntry, $context, $request);
+        }
+
         $resolution = $this->resolver->resolve($request->method);
 
         if ($resolution === null) {
             throw new MethodNotFoundException("Method not found: {$request->method}");
         }
 
-        if ($this->registry !== null) {
-            $handlers = $this->registry->getHandlers();
-            if (!isset($handlers[$request->method])) {
-                throw new MethodNotFoundException("Method not found: {$request->method}");
-            }
+        if ($this->registry !== null && $registryEntry === null) {
+            throw new MethodNotFoundException("Method not found: {$request->method}");
         }
 
         if (!class_exists($resolution->className)) {
@@ -52,26 +61,48 @@ final class HandlerDispatcher
             throw new MethodNotFoundException("Handler class not found: {$resolution->className}");
         }
 
-        $instance = $this->createInstance($resolution->className, $context);
-        $reflection = new ReflectionClass($instance);
+        return $this->invokeHandler($resolution->className, $resolution->methodName, $request, $context);
+    }
 
-        if (!$reflection->hasMethod($resolution->methodName)) {
-            throw new MethodNotFoundException("Method not found: {$resolution->methodName}");
+    /**
+     * @param array{class: string, method: string, file: string, descriptor?: bool} $entry
+     */
+    private function dispatchDescriptor(array $entry, RequestContext $context, Request $request): mixed
+    {
+        $className = $entry['class'];
+        $methodName = $entry['method'];
+
+        if (!class_exists($className)) {
+            throw new MethodNotFoundException("Handler class not found: {$className}");
         }
 
-        $method = $reflection->getMethod($resolution->methodName);
+        return $this->invokeHandler($className, $methodName, $request, $context);
+    }
 
-        $this->validateMethod($method, $resolution->methodName);
+    private function invokeHandler(string $className, string $methodName, Request $request, RequestContext $context): mixed
+    {
+        $instance = $this->createInstance($className, $context);
+        $reflection = new ReflectionClass($instance);
+
+        if (!$reflection->hasMethod($methodName)) {
+            throw new MethodNotFoundException("Method not found: {$methodName}");
+        }
+
+        $method = $reflection->getMethod($methodName);
+
+        $this->validateMethod($method, $methodName);
 
         $args = $this->parameterBinder->bind($method, $request->params, $context);
 
         try {
             return $method->invokeArgs($instance, $args);
-        } catch (JsonRpcException $e) {
-            throw $e;
-        } catch (\TypeError $e) {
-            throw new InvalidParamsException($e->getMessage(), 0, $e);
         } catch (Throwable $e) {
+            if ($e instanceof JsonRpcException) {
+                throw $e;
+            }
+            if ($e instanceof \TypeError) {
+                throw new InvalidParamsException($e->getMessage(), 0, $e);
+            }
             throw new InternalErrorException(
                 $e->getMessage(),
                 (int)$e->getCode(),
@@ -82,6 +113,20 @@ final class HandlerDispatcher
 
     public function resolveMethod(string $method): ?MethodResolution
     {
+        if ($this->registry !== null) {
+            $handlers = $this->registry->getHandlers();
+            if (isset($handlers[$method])) {
+                $entry = $handlers[$method];
+                if (($entry['descriptor'] ?? false) === true) {
+                    return new MethodResolution(
+                        $entry['class'],
+                        $entry['method'],
+                        '',
+                    );
+                }
+            }
+        }
+
         $resolution = $this->resolver->resolve($method);
         if ($resolution === null) {
             return null;

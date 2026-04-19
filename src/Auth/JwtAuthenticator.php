@@ -72,6 +72,9 @@ final class JwtAuthenticator implements AuthenticatorInterface
         return false;
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
     private function decodeJwt(string $token): ?array
     {
         if (class_exists(\Firebase\JWT\JWT::class)) {
@@ -87,6 +90,9 @@ final class JwtAuthenticator implements AuthenticatorInterface
         return $this->decodeJwtManual($token);
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
     private function decodeJwtManual(string $token): ?array
     {
         $parts = explode('.', $token);

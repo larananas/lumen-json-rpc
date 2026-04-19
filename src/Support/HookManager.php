@@ -18,6 +18,7 @@ enum HookPoint: string
 
 final class HookManager
 {
+    /** @var array<string, array<int, array{callback: callable, priority: int}>> */
     private array $hooks = [];
 
     public function register(HookPoint $point, callable $callback, int $priority = 0): void
@@ -29,6 +30,10 @@ final class HookManager
         );
     }
 
+    /**
+     * @param array<string, mixed> $context
+     * @return array<string, mixed>
+     */
     public function fire(HookPoint $point, array $context = []): array
     {
         $hooks = $this->hooks[$point->value] ?? [];

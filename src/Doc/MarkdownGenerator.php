@@ -6,6 +6,9 @@ namespace Lumen\JsonRpc\Doc;
 
 final class MarkdownGenerator
 {
+    /**
+     * @param array<int, MethodDoc> $docs
+     */
     public function generate(array $docs, string $serverName = 'JSON-RPC 2.0 API'): string
     {
         $md = "# $serverName\n\n";
@@ -73,7 +76,7 @@ final class MarkdownGenerator
                 if (isset($error['code'])) {
                     $md .= "- **{$error['code']}**: {$error['description']}\n";
                 } else {
-                    $md .= "- **{$error['type']}**: {$error['description']}\n";
+                    $md .= "- **" . ($error['type'] ?? 'unknown') . "**: {$error['description']}\n";
                 }
             }
             $md .= "\n";

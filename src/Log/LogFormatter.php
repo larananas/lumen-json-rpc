@@ -16,6 +16,9 @@ final class LogFormatter
         private readonly bool $sanitizeSecrets = true,
     ) {}
 
+    /**
+     * @param array<string, mixed> $context
+     */
     public function format(string $level, string $message, array $context = [], ?string $correlationId = null): string
     {
         $timestamp = date('Y-m-d\TH:i:s.vP');
@@ -37,12 +40,16 @@ final class LogFormatter
         return str_replace(["\r", "\n"], ['\\r', '\\n'], $text);
     }
 
+    /**
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>
+     */
     private function sanitize(array $data): array
     {
         foreach ($data as $key => $value) {
             if (is_array($value)) {
                 $data[$key] = $this->sanitize($value);
-            } elseif (is_string($key) && $this->isSensitiveKey($key)) {
+            } elseif ($this->isSensitiveKey((string)$key)) {
                 $data[$key] = '***REDACTED***';
             }
         }

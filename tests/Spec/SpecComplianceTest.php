@@ -228,5 +228,77 @@ final class SpecComplianceTest extends TestCase
         $this->assertEquals('abc-123', $data['id']);
     }
 
+    public function testRpcPrefixRejectedInRequest(): void
+    {
+        $body = json_encode([
+            'jsonrpc' => '2.0',
+            'method' => 'rpc.reserved',
+            'id' => 1,
+        ]);
+        $response = $this->server->handle($this->request($body));
+        $data = $this->parseResponse($response);
+        $this->assertEquals(-32600, $data['error']['code']);
+    }
 
+    public function testFloatIdRejectedInRequest(): void
+    {
+        $body = json_encode([
+            'jsonrpc' => '2.0',
+            'method' => 'system.health',
+            'id' => 1.5,
+        ]);
+        $response = $this->server->handle($this->request($body));
+        $data = $this->parseResponse($response);
+        $this->assertEquals(-32600, $data['error']['code']);
+    }
+
+    public function testBooleanIdRejectedInRequest(): void
+    {
+        $body = json_encode([
+            'jsonrpc' => '2.0',
+            'method' => 'system.health',
+            'id' => true,
+        ]);
+        $response = $this->server->handle($this->request($body));
+        $data = $this->parseResponse($response);
+        $this->assertEquals(-32600, $data['error']['code']);
+    }
+
+    public function testNullIdIsNotANotification(): void
+    {
+        $body = json_encode([
+            'jsonrpc' => '2.0',
+            'method' => 'system.health',
+            'id' => null,
+        ]);
+        $response = $this->server->handle($this->request($body));
+        $this->assertEquals(200, $response->statusCode);
+        $data = $this->parseResponse($response);
+        $this->assertNull($data['id']);
+    }
+
+    public function testParamsAsArrayAccepted(): void
+    {
+        $body = json_encode([
+            'jsonrpc' => '2.0',
+            'method' => 'system.health',
+            'params' => [1, 2, 3],
+            'id' => 1,
+        ]);
+        $response = $this->server->handle($this->request($body));
+        $data = $this->parseResponse($response);
+        $this->assertArrayHasKey('result', $data);
+    }
+
+    public function testEmptyStringIdAccepted(): void
+    {
+        $body = json_encode([
+            'jsonrpc' => '2.0',
+            'method' => 'system.health',
+            'id' => '',
+        ]);
+        $response = $this->server->handle($this->request($body));
+        $data = $this->parseResponse($response);
+        $this->assertEquals('', $data['id']);
+    }
 }

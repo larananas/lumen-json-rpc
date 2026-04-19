@@ -12,7 +12,9 @@ final class DefaultHandlerFactory implements HandlerFactoryInterface
 {
     public function create(string $className, RequestContext $context): object
     {
+        /** @var class-string $className */
         $reflection = new ReflectionClass($className);
+
 
         $constructor = $reflection->getConstructor();
         if ($constructor === null) {

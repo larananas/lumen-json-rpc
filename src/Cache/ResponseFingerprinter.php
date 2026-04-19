@@ -19,7 +19,7 @@ final class ResponseFingerprinter
     public function fingerprint(mixed $data): string
     {
         $canonical = $this->canonicalize($data);
-        $json = json_encode($canonical, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE);
+        $json = json_encode($canonical, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR);
         return hash($this->algorithm, $json);
     }
 

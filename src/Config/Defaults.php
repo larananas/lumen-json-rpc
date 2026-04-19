@@ -4,8 +4,14 @@ declare(strict_types=1);
 
 namespace Lumen\JsonRpc\Config;
 
+/**
+ * @internal
+ */
 final class Defaults
 {
+    /**
+     * @return array<string, mixed>
+     */
     public static function all(): array
     {
         return [

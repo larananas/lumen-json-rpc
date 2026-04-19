@@ -9,6 +9,7 @@
 [![Tests](https://github.com/larananas/lumen-json-rpc/actions/workflows/ci.yml/badge.svg)](https://github.com/larananas/lumen-json-rpc/actions/workflows/ci.yml)
 [![License: LGPL-3.0-or-later](https://img.shields.io/badge/license-LGPL--3.0--or--later-blue.svg)](LICENSE)
 [![PHP](https://img.shields.io/badge/PHP-modern-777bb4.svg)](#)
+[![Docs](https://img.shields.io/badge/docs-website-blue.svg)](https://larananas.github.io/lumen-json-rpc/)
 
 </div>
 
@@ -55,6 +56,8 @@ A clean JSON-RPC 2.0 server for PHP that stays:
 ---
 
 ## 📦 Install
+
+> **Documentation website**: [larananas.github.io/lumen-json-rpc](https://larananas.github.io/lumen-json-rpc/)
 
 ```bash
 composer require larananas/lumen-json-rpc
@@ -129,7 +132,11 @@ curl -X POST http://localhost:8000/ \
 ### 4) Response
 
 ```json
-{"jsonrpc":"2.0","result":{"id":1,"name":"Example User","requested_by":null},"id":1}
+{
+    "jsonrpc": "2.0",
+    "result": { "id": 1, "name": "Example User", "requested_by": null },
+    "id": 1
+}
 ```
 
 ---
@@ -162,7 +169,7 @@ No “where is this route even defined?” nonsense.
 
 You can protect method prefixes with:
 
-- JWT *(default driver when auth is enabled)*
+- JWT _(default driver when auth is enabled)_
 - API key
 - HTTP Basic
 
@@ -243,6 +250,30 @@ $server->addMiddleware(new class implements MiddlewareInterface {
 });
 ```
 
+### 📋 Explicit procedure descriptors (optional)
+
+The default `handler.method` auto-discovery is the primary model. For advanced use cases, you can also register procedures explicitly:
+
+```php
+<?php
+
+use Lumen\JsonRpc\Dispatcher\ProcedureDescriptor;
+
+$registry = $server->getRegistry();
+
+$registry->register('math.add', MathHandler::class, 'add', [
+    'description' => 'Add two numbers',
+]);
+
+// Or batch-register descriptor objects:
+$registry->registerDescriptors([
+    new ProcedureDescriptor('math.add', MathHandler::class, 'add', ['description' => 'Add two numbers']),
+    new ProcedureDescriptor('math.multiply', MathHandler::class, 'multiply'),
+]);
+```
+
+Explicit descriptors work alongside auto-discovered handlers. Descriptor metadata is used by documentation generators.
+
 ### ✅ Optional schema validation
 
 When you want more than simple type binding, a handler can provide a lightweight validation schema.
@@ -289,21 +320,21 @@ If you do nothing, normal parameter binding still works exactly fine.
 This is a **scope-level comparison** based on public docs and default library behavior.
 It is intentionally simplified and focused on developer-facing features.
 
-| Feature | Lumen JSON-RPC | uma/json-rpc | datto/json-rpc | fguillot/json-rpc |
-|---|---:|---:|---:|---:|
-| Framework-free server | ✅ | ✅ | ✅ | ✅ |
-| HTTP support out of the box | ✅ | ❌ | ✅ | ✅ |
-| Direct core usage without HTTP | ✅ | ✅ | ✅ | ❌ |
-| Strict `handler.method` auto-discovery | ✅ | ❌ | ❌ | ❌ |
-| Middleware pipeline | ✅ | ✅ | ❌ | ✅ |
-| Optional advanced param validation | ✅ | ✅ | 🟡~ | ❌ |
-| JWT built in | ✅ | ❌ | 🟡~ | ❌ |
-| API key built in | ✅ | ❌ | 🟡~ | ❌ |
-| Basic auth built in | ✅ | ❌ | 🟡~ | ✅ |
-| Rate limiting built in | ✅ | ❌ | ❌ | ❌ |
-| Gzip support built in | ✅ | ❌ | ❌ | ❌ |
-| Docs generation built in | ✅ | ❌ | ❌ | ❌ |
-| No mandatory external Composer deps in production | ✅ | ❌ | ✅ | ✅ |
+| Feature                                           | Lumen JSON-RPC | uma/json-rpc | datto/json-rpc | fguillot/json-rpc |
+| ------------------------------------------------- | -------------: | -----------: | -------------: | ----------------: |
+| Framework-free server                             |             ✅ |           ✅ |             ✅ |                ✅ |
+| HTTP support out of the box                       |             ✅ |           ❌ |             ✅ |                ✅ |
+| Direct core usage without HTTP                    |             ✅ |           ✅ |             ✅ |                ❌ |
+| Strict `handler.method` auto-discovery            |             ✅ |           ❌ |             ❌ |                ❌ |
+| Middleware pipeline                               |             ✅ |           ✅ |             ❌ |                ✅ |
+| Optional advanced param validation                |             ✅ |           ✅ |            🟡~ |                ❌ |
+| JWT built in                                      |             ✅ |           ❌ |            🟡~ |                ❌ |
+| API key built in                                  |             ✅ |           ❌ |            🟡~ |                ❌ |
+| Basic auth built in                               |             ✅ |           ❌ |            🟡~ |                ✅ |
+| Rate limiting built in                            |             ✅ |           ❌ |             ❌ |                ❌ |
+| Gzip support built in                             |             ✅ |           ❌ |             ❌ |                ❌ |
+| Docs generation built in                          |             ✅ |           ❌ |             ❌ |                ❌ |
+| No mandatory external Composer deps in production |             ✅ |           ❌ |             ✅ |                ✅ |
 
 ### Why this matters
 
@@ -385,7 +416,7 @@ This keeps execution paths explicit and limits surprises.
 
 ### Available drivers
 
-- `jwt` *(default when auth is enabled)*
+- `jwt` _(default when auth is enabled)_
 - `api_key`
 - `basic`
 
@@ -488,11 +519,36 @@ Rate-limited requests return:
 - HTTP `429`
 - JSON-RPC error `-32000`
 - headers such as:
-  - `X-RateLimit-Limit`
-  - `X-RateLimit-Remaining`
-  - `Retry-After`
+    - `X-RateLimit-Limit`
+    - `X-RateLimit-Remaining`
+    - `Retry-After`
 
 Batch weight counts actual items received, and consumption is atomic.
+
+### Custom backends
+
+The rate limit storage is pluggable. Implement `RateLimiterInterface` to use Redis, Memcached, or any backend:
+
+```php
+$server->getEngine()->getRateLimitManager()->setLimiter(new MyRedisRateLimiter());
+```
+
+An `InMemoryRateLimiter` is included for testing.
+
+## 📦 Batch Limits
+
+Batch requests are limited to `batch.max_items` (default: 100):
+
+```php
+'batch' => [
+    'max_items' => 50,
+],
+```
+
+- Empty batch (`[]`) returns `-32600 Invalid Request`
+- Oversized batch returns `-32600 Invalid Request` with the limit in the error data
+- Batch of only notifications returns HTTP 204
+- Mixed batches return responses only for non-notification requests
 
 ---
 
@@ -500,7 +556,7 @@ Batch weight counts actual items received, and consumption is atomic.
 
 If `ext-zlib` is available:
 
-- `compression.request_gzip: true` *(default)* accepts `Content-Encoding: gzip`
+- `compression.request_gzip: true` _(default)_ accepts `Content-Encoding: gzip`
 - `compression.response_gzip: true` sends gzipped responses when the client advertises support
 
 If `ext-zlib` is not available, the library degrades cleanly.
@@ -587,7 +643,15 @@ Generate docs from handler metadata:
 php bin/generate-docs.php --format=markdown --output=docs/api.md
 php bin/generate-docs.php --format=html --output=docs/api.html
 php bin/generate-docs.php --format=json --output=docs/api.json
+php bin/generate-docs.php --format=openrpc --output=docs/openrpc.json
 ```
+
+Supported formats:
+
+- `markdown` — Markdown documentation (default)
+- `html` — Styled HTML page
+- `json` — Machine-readable JSON
+- `openrpc` — [OpenRPC 1.3.2](https://spec.open-rpc.org/) specification for client generation and tooling
 
 ---
 
@@ -625,16 +689,16 @@ A tiny HTML page that lets you send raw JSON-RPC requests and inspect the raw re
 
 ## 🚨 Error codes
 
-| Code   | Meaning                 | When                                                |
-| ------ | ----------------------- | --------------------------------------------------- |
-| -32700 | Parse error             | Invalid JSON                                        |
-| -32600 | Invalid Request         | Malformed request, empty body, empty batch          |
-| -32601 | Method not found        | Unknown or reserved method                          |
-| -32602 | Invalid params          | Missing, wrong type, unknown, or surplus parameters |
+| Code   | Meaning                 | When                                                   |
+| ------ | ----------------------- | ------------------------------------------------------ |
+| -32700 | Parse error             | Invalid JSON                                           |
+| -32600 | Invalid Request         | Malformed request, empty body, empty batch             |
+| -32601 | Method not found        | Unknown or reserved method                             |
+| -32602 | Invalid params          | Missing, wrong type, unknown, or surplus parameters    |
 | -32603 | Internal error          | Handler or middleware exception, serialization failure |
-| -32000 | Rate limit exceeded     | Too many requests                                   |
-| -32001 | Authentication required | Protected method without valid credentials          |
-| -32099 | Custom server error     | Application-defined                                 |
+| -32000 | Rate limit exceeded     | Too many requests                                      |
+| -32001 | Authentication required | Protected method without valid credentials             |
+| -32099 | Custom server error     | Application-defined                                    |
 
 ### Error handling notes
 
@@ -678,6 +742,54 @@ Security-sensitive behavior includes:
 - rate limiting uses atomic file locking with configurable fail-open / fail-closed behavior
 
 See [docs/security.md](docs/security.md) for details.
+
+---
+
+## 📖 Documentation Website
+
+This repository includes a static documentation site published via GitHub Pages.
+
+**Default URL**: [larananas.github.io/lumen-json-rpc](https://larananas.github.io/lumen-json-rpc/)
+
+### Build the site locally
+
+```bash
+composer docs:build
+```
+
+This generates the `docs-site/` directory with 15 HTML pages.
+
+### Deployment
+
+Docs are deployed automatically by the `Deploy Docs` GitHub Actions workflow:
+
+- **On release**: publish a GitHub release and docs deploy automatically
+- **Manual trigger**: go to Actions → Deploy Docs → Run workflow
+
+### Enabling GitHub Pages (one-time setup)
+
+1. Go to **Settings → Pages**
+2. Set **Source** to **GitHub Actions** (not "Deploy from a branch")
+3. Trigger a deployment (release or manual workflow dispatch)
+4. The site will be available at `https://larananas.github.io/lumen-json-rpc/`
+
+### Custom domain (optional)
+
+Custom domains are **not automatic** — they require manual DNS and GitHub configuration.
+
+To use a custom domain:
+
+1. Configure your DNS provider to point a CNAME record to `larananas.github.io`
+2. In GitHub Settings → Pages → Custom domain, enter your domain
+3. Build the docs with the `DOCS_CNAME` environment variable set:
+
+```bash
+DOCS_CNAME=your-domain.example.com composer docs:build
+```
+
+For CI deployments, add `DOCS_CNAME` as a repository secret and reference it in the workflow.
+
+Without `DOCS_CNAME`, no CNAME file is emitted and the standard GitHub Pages project URL is used.
 
 ---
 

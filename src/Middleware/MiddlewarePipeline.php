@@ -10,6 +10,7 @@ use Lumen\JsonRpc\Support\RequestContext;
 
 final class MiddlewarePipeline
 {
+    /** @var array<int, MiddlewareInterface> */
     private array $middlewares = [];
 
     public function add(MiddlewareInterface $middleware): void

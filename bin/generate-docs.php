@@ -15,17 +15,18 @@ use Lumen\JsonRpc\Doc\DocGenerator;
 use Lumen\JsonRpc\Doc\MarkdownGenerator;
 use Lumen\JsonRpc\Doc\JsonDocGenerator;
 use Lumen\JsonRpc\Doc\HtmlGenerator;
+use Lumen\JsonRpc\Doc\OpenRpcGenerator;
 
 $options = getopt('', ['format:', 'output:', 'config:', 'help']);
-$format = $options['format'] ?? 'markdown';
-$outputPath = $options['output'] ?? null;
-$configPath = $options['config'] ?? __DIR__ . '/../examples/config.php';
+$format = is_string($options['format'] ?? null) ? $options['format'] : 'markdown';
+$outputPath = is_string($options['output'] ?? null) ? $options['output'] : null;
+$configPath = is_string($options['config'] ?? null) ? $options['config'] : __DIR__ . '/../examples/basic/config.php';
 
 if (isset($options['help'])) {
     echo "JSON-RPC Documentation Generator\n\n";
     echo "Usage: php bin/generate-docs.php [options]\n\n";
     echo "Options:\n";
-    echo "  --format=FORMAT    Output format: markdown, json, html (default: markdown)\n";
+    echo "  --format=FORMAT    Output format: markdown, json, html, openrpc (default: markdown)\n";
     echo "  --output=PATH      Output file path (default: stdout)\n";
     echo "  --config=PATH      Config file path\n";
     echo "  --help             Show this help\n";
@@ -39,6 +40,7 @@ $registry = new HandlerRegistry(
     $config->get('handlers.namespace', 'App\\Handlers\\'),
     $config->get('handlers.method_separator', '.'),
 );
+$registry->discover();
 
 $generator = new DocGenerator($registry);
 $docs = $generator->generate();
@@ -48,6 +50,11 @@ $serverName = $config->get('server.name', 'JSON-RPC 2.0 API');
 $output = match ($format) {
     'json' => (new JsonDocGenerator())->generate($docs, $serverName),
     'html' => (new HtmlGenerator())->generate($docs, $serverName),
+    'openrpc' => (new OpenRpcGenerator())->generate(
+        $docs,
+        $serverName,
+        $config->get('server.version', '1.0.0'),
+    ),
     default => (new MarkdownGenerator())->generate($docs, $serverName),
 };
 

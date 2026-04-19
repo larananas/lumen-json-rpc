@@ -16,6 +16,11 @@ final class Compressor
         return self::$zlibAvailable;
     }
 
+    public static function resetCache(): void
+    {
+        self::$zlibAvailable = null;
+    }
+
     public static function decodeGzip(string $data): ?string
     {
         if ($data === '') {

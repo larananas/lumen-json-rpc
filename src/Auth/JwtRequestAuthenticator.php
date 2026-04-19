@@ -12,6 +12,9 @@ final class JwtRequestAuthenticator implements RequestAuthenticatorInterface
         private readonly string $prefix = 'Bearer ',
     ) {}
 
+    /**
+     * @param array<string, string> $headers
+     */
     public function authenticateFromHeaders(array $headers): ?UserContext
     {
         $authHeader = $this->getHeaderCaseInsensitive($headers, $this->header);
@@ -31,6 +34,9 @@ final class JwtRequestAuthenticator implements RequestAuthenticatorInterface
         return $this->jwtAuthenticator->authenticate($token);
     }
 
+    /**
+     * @param array<string, string> $headers
+     */
     private function getHeaderCaseInsensitive(array $headers, string $name): ?string
     {
         $lower = strtolower($name);

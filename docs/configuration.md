@@ -40,7 +40,6 @@ return [
         ],
         'basic' => [
             'header' => 'Authorization',
-            'realm' => 'Lumen JSON-RPC',
             'users' => [],
         ],
     ],
@@ -119,23 +118,22 @@ return [
 
 ### `auth`
 
-| Key                 | Default            | Description                                                                        |
-| ------------------- | ------------------ | ---------------------------------------------------------------------------------- |
-| `enabled`           | `false`            | Enable authentication                                                              |
-| `driver`            | `'jwt'`            | Auth driver: `jwt`, `api_key`, or `basic`                                          |
-| `protected_methods` | `[]`               | Array of method prefixes that require authentication (e.g., `['user.', 'order.']`) |
-| `jwt.secret`        | `''`               | JWT signing secret (required when driver is `jwt`)                                 |
-| `jwt.algorithm`     | `'HS256'`          | JWT algorithm: `HS256`, `HS384`, or `HS512`                                        |
-| `jwt.header`        | `'Authorization'`  | HTTP header to read the token from                                                 |
-| `jwt.prefix`        | `'Bearer '`        | Token prefix in the header value                                                   |
-| `jwt.issuer`        | `''`               | Expected `iss` claim (empty = not validated)                                       |
-| `jwt.audience`      | `''`               | Expected `aud` claim (empty = not validated, supports string and array)            |
-| `jwt.leeway`        | `0`                | Clock skew tolerance in seconds (applied to `exp`, `nbf`, `iat`)                   |
-| `api_key.header`    | `'X-API-Key'`      | HTTP header for API key                                                            |
-| `api_key.keys`      | `[]`               | Map of valid API keys to user config (`user_id`, `roles`, `claims`)                |
-| `basic.header`      | `'Authorization'`  | HTTP header for Basic auth                                                         |
-| `basic.realm`       | `'Lumen JSON-RPC'` | Realm identifier                                                                   |
-| `basic.users`       | `[]`               | Map of usernames to config (`password`, `user_id`, `roles`, `claims`)              |
+| Key                 | Default           | Description                                                                        |
+| ------------------- | ----------------- | ---------------------------------------------------------------------------------- |
+| `enabled`           | `false`           | Enable authentication                                                              |
+| `driver`            | `'jwt'`           | Auth driver: `jwt`, `api_key`, or `basic`                                          |
+| `protected_methods` | `[]`              | Array of method prefixes that require authentication (e.g., `['user.', 'order.']`) |
+| `jwt.secret`        | `''`              | JWT signing secret (required when driver is `jwt`)                                 |
+| `jwt.algorithm`     | `'HS256'`         | JWT algorithm: `HS256`, `HS384`, or `HS512`                                        |
+| `jwt.header`        | `'Authorization'` | HTTP header to read the token from                                                 |
+| `jwt.prefix`        | `'Bearer '`       | Token prefix in the header value                                                   |
+| `jwt.issuer`        | `''`              | Expected `iss` claim (empty = not validated)                                       |
+| `jwt.audience`      | `''`              | Expected `aud` claim (empty = not validated, supports string and array)            |
+| `jwt.leeway`        | `0`               | Clock skew tolerance in seconds (applied to `exp`, `nbf`, `iat`)                   |
+| `api_key.header`    | `'X-API-Key'`     | HTTP header for API key                                                            |
+| `api_key.keys`      | `[]`              | Map of valid API keys to user config (`user_id`, `roles`, `claims`)                |
+| `basic.header`      | `'Authorization'` | HTTP header for Basic auth                                                         |
+| `basic.users`       | `[]`              | Map of usernames to config (`password`, `user_id`, `roles`, `claims`)              |
 
 The built-in JWT decoder supports HMAC algorithms only. Install `firebase/php-jwt` if you need additional algorithm support.
 
@@ -144,6 +142,17 @@ The built-in JWT decoder supports HMAC algorithms only. Install `firebase/php-jw
 | Key         | Default | Description                           |
 | ----------- | ------- | ------------------------------------- |
 | `max_items` | `100`   | Maximum number of requests in a batch |
+
+When a batch request exceeds `max_items`, the server returns a single `-32600 Invalid Request` error with a `data` field indicating the maximum allowed.
+
+**Batch behavior summary:**
+
+- Empty batch (`[]`): returns `-32600 Invalid Request`
+- Batch under limit: processed normally
+- Batch at limit exactly: processed normally
+- Batch over limit: returns single `-32600` error for the entire batch
+- Batch of only notifications (no `id` fields): returns HTTP 204, no body
+- Mixed batch with notifications: only non-notification responses are returned
 
 ### `limits`
 
@@ -192,6 +201,32 @@ Gzip support requires the `zlib` extension (`ext-zlib`), which is an optional de
 | `fail_open`      | `true`                 | Allow requests on storage failure (`true`) or deny (`false`) |
 
 When rate-limited, the server returns HTTP 429 with a `-32000` JSON-RPC error and `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `Retry-After` headers.
+
+#### Custom rate limit backends
+
+The rate limiter backend is pluggable via `RateLimiterInterface`. To use a custom backend:
+
+```php
+use Lumen\JsonRpc\RateLimit\RateLimiterInterface;
+use Lumen\JsonRpc\RateLimit\RateLimitResult;
+
+class RedisRateLimiter implements RateLimiterInterface
+{
+    public function check(string $key): RateLimitResult
+    {
+        return $this->checkAndConsume($key, 1);
+    }
+
+    public function checkAndConsume(string $key, int $weight): RateLimitResult
+    {
+        // Your Redis-backed implementation
+    }
+}
+
+$server->getEngine()->getRateLimitManager()->setLimiter(new RedisRateLimiter(...));
+```
+
+An `InMemoryRateLimiter` is included for testing and single-process use cases.
 
 ### `debug`
 

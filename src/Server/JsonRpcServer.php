@@ -30,6 +30,7 @@ use Lumen\JsonRpc\Protocol\Error;
 use Lumen\JsonRpc\Protocol\RequestValidator;
 use Lumen\JsonRpc\Protocol\Response;
 use Lumen\JsonRpc\RateLimit\FileRateLimiter;
+use Lumen\JsonRpc\RateLimit\RateLimiterInterface;
 use Lumen\JsonRpc\RateLimit\RateLimitManager;
 use Lumen\JsonRpc\Support\Compressor;
 use Lumen\JsonRpc\Support\CorrelationId;
@@ -88,7 +89,6 @@ final class JsonRpcServer
             $this->authManager,
             $this->rateLimitManager,
             $this->fingerprinter,
-            $this->validator,
             $this->batchProcessor,
             $this->dispatcher,
             $this->registry,
@@ -104,11 +104,12 @@ final class JsonRpcServer
         if ($httpRequest->method !== 'POST') {
             if ($httpRequest->method === 'GET' && $this->config->get('health.enabled', true)) {
                 $this->fireHook(HookPoint::BEFORE_REQUEST, ['correlationId' => $correlationId, 'health' => true]);
-                $response = HttpResponse::json(json_encode([
+                $healthJson = json_encode([
                     'status' => 'ok',
                     'server' => $this->config->get('server.name', 'Lumen JSON-RPC'),
                     'version' => $this->config->get('server.version', '1.0.0'),
-                ]));
+                ], JSON_THROW_ON_ERROR);
+                $response = HttpResponse::json($healthJson);
                 $this->fireHook(HookPoint::ON_RESPONSE, ['status' => 200, 'correlationId' => $correlationId, 'health' => true]);
                 $this->fireHook(HookPoint::AFTER_REQUEST, ['correlationId' => $correlationId, 'health' => true]);
                 return $response;
@@ -153,7 +154,6 @@ final class JsonRpcServer
         }
 
         $requestContext = $this->buildRequestContext($httpRequest, $correlationId, $body);
-        $requestContext = $this->engine->authenticateFromHeaders($httpRequest->headers, $requestContext);
 
         $result = $this->engine->handleJson($body, $requestContext);
 
@@ -190,6 +190,12 @@ final class JsonRpcServer
         return $this;
     }
 
+    public function setRateLimiter(RateLimiterInterface $limiter): self
+    {
+        $this->rateLimitManager->setLimiter($limiter);
+        return $this;
+    }
+
     private function engineResultToHttpResponse(EngineResult $result, HttpRequest $httpRequest): HttpResponse
     {
         if ($result->isNoContent()) {
@@ -197,9 +203,10 @@ final class JsonRpcServer
         }
 
         $statusCode = $result->statusCode;
+        $json = $result->json ?? '';
 
         if ($statusCode === 200 && $this->fingerprinter->isEnabled()) {
-            $decoded = json_decode($result->json, true);
+            $decoded = json_decode($json, true);
             if (is_array($decoded) && !isset($decoded[0]) && !isset($decoded['error'])) {
                 $fp = $this->fingerprinter->fingerprint($decoded);
                 $etag = '"' . $fp . '"';
@@ -210,13 +217,16 @@ final class JsonRpcServer
                     return new HttpResponse('', 304, $headers);
                 }
 
-                return $this->buildHttpResponse($result->json, $statusCode, $httpRequest, $headers);
+                return $this->buildHttpResponse($json, $statusCode, $httpRequest, $headers);
             }
         }
 
-        return $this->buildHttpResponse($result->json, $statusCode, $httpRequest, $result->headers);
+        return $this->buildHttpResponse($json, $statusCode, $httpRequest, $result->headers);
     }
 
+    /**
+     * @param array<string, string> $extraHeaders
+     */
     private function buildHttpResponse(
         string $json,
         int $statusCode,
@@ -291,6 +301,10 @@ final class JsonRpcServer
         }
     }
 
+    /**
+     * @param array<string, mixed> $context
+     * @return array<string, mixed>
+     */
     private function fireHook(HookPoint $point, array $context = []): array
     {
         if ($this->config->get('hooks.enabled', true)) {

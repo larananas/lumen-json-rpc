@@ -43,6 +43,9 @@ final class BatchProcessor
         return $this->processBatch($decoded);
     }
 
+    /**
+     * @param array<int, mixed> $items
+     */
     private function processBatch(array $items): BatchResult
     {
         if (count($items) > $this->maxItems) {
@@ -75,6 +78,9 @@ final class BatchProcessor
         return new BatchResult($requests, $errors, true);
     }
 
+    /**
+     * @param array<string, mixed>|array<int, mixed> $arr
+     */
     private function isAssociative(array $arr): bool
     {
         if (empty($arr)) {

@@ -6,10 +6,15 @@ namespace Lumen\JsonRpc\Protocol;
 
 final class RequestValidator
 {
+    private const MAX_METHOD_LENGTH = 256;
+
     public function __construct(
         private readonly bool $strict = true,
     ) {}
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public function validateArray(array $data): ?Error
     {
         if (!isset($data['jsonrpc']) || $data['jsonrpc'] !== '2.0') {
@@ -24,8 +29,21 @@ final class RequestValidator
             return Error::invalidRequest('method must not be empty');
         }
 
-        if (array_key_exists('id', $data) && $data['id'] !== null && !is_string($data['id']) && !is_int($data['id']) && !is_float($data['id'])) {
-            return Error::invalidRequest('id must be string, number, or null');
+        if (strlen($data['method']) > self::MAX_METHOD_LENGTH) {
+            return Error::invalidRequest('method name too long');
+        }
+
+        if (str_starts_with($data['method'], 'rpc.')) {
+            return Error::invalidRequest('method names starting with "rpc." are reserved');
+        }
+
+        if (array_key_exists('id', $data) && $data['id'] !== null) {
+            if (!is_string($data['id']) && !is_int($data['id'])) {
+                if (is_float($data['id'])) {
+                    return Error::invalidRequest('id must not contain fractional parts (spec: Numbers SHOULD NOT contain fractional parts)');
+                }
+                return Error::invalidRequest('id must be string, integer, or null');
+            }
         }
 
         if (array_key_exists('params', $data)) {

@@ -6,11 +6,17 @@ namespace Lumen\JsonRpc\Auth;
 
 final class BasicAuthenticator implements RequestAuthenticatorInterface
 {
+    /**
+     * @param array<string, array{password: string, user_id?: string, claims?: array<string, mixed>, roles?: array<int, string>}> $users
+     */
     public function __construct(
         private readonly string $header = 'Authorization',
         private readonly array $users = [],
     ) {}
 
+    /**
+     * @param array<string, string> $headers
+     */
     public function authenticateFromHeaders(array $headers): ?UserContext
     {
         $authHeader = $this->getHeaderCaseInsensitive($headers, $this->header);
@@ -57,6 +63,9 @@ final class BasicAuthenticator implements RequestAuthenticatorInterface
         );
     }
 
+    /**
+     * @param array<string, string> $headers
+     */
     private function getHeaderCaseInsensitive(array $headers, string $name): ?string
     {
         $lower = strtolower($name);

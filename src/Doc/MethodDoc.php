@@ -6,6 +6,10 @@ namespace Lumen\JsonRpc\Doc;
 
 final class MethodDoc
 {
+    /**
+     * @param array<string, array{type: string, description: string, required: bool, default: mixed}> $params
+     * @param array<int, array{type?: string, code?: string, message?: string, description: string}> $errors
+     */
     public function __construct(
         public readonly string $name,
         public readonly string $description = '',
@@ -18,6 +22,9 @@ final class MethodDoc
         public readonly ?string $exampleResponse = null,
     ) {}
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
         return [

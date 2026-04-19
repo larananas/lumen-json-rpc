@@ -19,14 +19,14 @@ final class RequestSanitizeIdTest extends TestCase
         $this->assertSame(42, Request::sanitizeId(42));
     }
 
-    public function testSanitizeIdReturnsFloatUnchanged(): void
-    {
-        $this->assertSame(3.14, Request::sanitizeId(3.14));
-    }
-
     public function testSanitizeIdReturnsNullUnchanged(): void
     {
         $this->assertNull(Request::sanitizeId(null));
+    }
+
+    public function testSanitizeIdReturnsNullForFloat(): void
+    {
+        $this->assertNull(Request::sanitizeId(3.14));
     }
 
     public function testSanitizeIdReturnsNullForBool(): void

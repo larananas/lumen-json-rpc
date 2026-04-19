@@ -6,6 +6,10 @@ namespace Lumen\JsonRpc\Http;
 
 final class HttpRequest
 {
+    /**
+     * @param array<string, string> $headers
+     * @param array<string, mixed> $server
+     */
     public function __construct(
         public readonly string $body,
         public readonly array $headers,

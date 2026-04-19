@@ -6,6 +6,9 @@ namespace Lumen\JsonRpc\Doc;
 
 final class HtmlGenerator
 {
+    /**
+     * @param array<int, MethodDoc> $docs
+     */
     public function generate(array $docs, string $serverName = 'JSON-RPC 2.0 API'): string
     {
         $html = "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n";
@@ -86,7 +89,7 @@ final class HtmlGenerator
         if (!empty($doc->errors)) {
             $html .= "<h3>Errors</h3><ul>\n";
             foreach ($doc->errors as $error) {
-                $label = isset($error['code']) ? $error['code'] : $error['type'];
+                $label = isset($error['code']) ? $error['code'] : ($error['type'] ?? '');
                 $html .= "<li><strong>" . htmlspecialchars((string)$label) . "</strong>: " . htmlspecialchars($error['description']) . "</li>\n";
             }
             $html .= "</ul>\n";

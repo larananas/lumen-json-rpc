@@ -13,19 +13,14 @@ use Lumen\JsonRpc\Auth\RequestAuthenticatorInterface;
 use Lumen\JsonRpc\Cache\ResponseFingerprinter;
 use Lumen\JsonRpc\Config\Config;
 use Lumen\JsonRpc\Dispatcher\HandlerDispatcher;
-use Lumen\JsonRpc\Dispatcher\HandlerFactoryInterface;
 use Lumen\JsonRpc\Dispatcher\HandlerRegistry;
-use Lumen\JsonRpc\Dispatcher\MethodResolver;
-use Lumen\JsonRpc\Dispatcher\ParameterBinder;
 use Lumen\JsonRpc\Exception\JsonRpcException;
 use Lumen\JsonRpc\Log\Logger;
 use Lumen\JsonRpc\Middleware\MiddlewarePipeline;
 use Lumen\JsonRpc\Middleware\MiddlewareInterface;
 use Lumen\JsonRpc\Protocol\BatchProcessor;
-use Lumen\JsonRpc\Protocol\BatchResult;
 use Lumen\JsonRpc\Protocol\Error;
 use Lumen\JsonRpc\Protocol\Request;
-use Lumen\JsonRpc\Protocol\RequestValidator;
 use Lumen\JsonRpc\Protocol\Response;
 use Lumen\JsonRpc\RateLimit\RateLimitManager;
 use Lumen\JsonRpc\Support\HookManager;
@@ -35,13 +30,25 @@ use Lumen\JsonRpc\Validation\SchemaValidator;
 
 final class JsonRpcEngine
 {
+    /**
+     * This class is the internal execution engine of JsonRpcServer.
+     *
+     * While technically public (returned by JsonRpcServer::getEngine()),
+     * its direct instantiation and method-calling API are NOT subject to
+     * backward-compatibility guarantees between minor versions.
+     *
+     * For stable usage, use JsonRpcServer as the primary entry point.
+     * If you need low-level engine access (e.g., for custom request processing),
+     * pin to an exact version in your composer.json.
+     *
+     * @internal
+     */
     private Config $config;
     private Logger $logger;
     private HookManager $hooks;
     private AuthManager $authManager;
     private RateLimitManager $rateLimitManager;
     private ResponseFingerprinter $fingerprinter;
-    private RequestValidator $validator;
     private BatchProcessor $batchProcessor;
     private HandlerDispatcher $dispatcher;
     private HandlerRegistry $registry;
@@ -56,7 +63,6 @@ final class JsonRpcEngine
         AuthManager $authManager,
         RateLimitManager $rateLimitManager,
         ResponseFingerprinter $fingerprinter,
-        RequestValidator $validator,
         BatchProcessor $batchProcessor,
         HandlerDispatcher $dispatcher,
         HandlerRegistry $registry,
@@ -67,7 +73,6 @@ final class JsonRpcEngine
         $this->authManager = $authManager;
         $this->rateLimitManager = $rateLimitManager;
         $this->fingerprinter = $fingerprinter;
-        $this->validator = $validator;
         $this->batchProcessor = $batchProcessor;
         $this->dispatcher = $dispatcher;
         $this->registry = $registry;
@@ -80,7 +85,7 @@ final class JsonRpcEngine
 
     public function handleJson(string $json, ?RequestContext $context = null): EngineResult
     {
-        $correlationId = $context?->correlationId ?? \Lumen\JsonRpc\Support\CorrelationId::generate();
+        $correlationId = $context !== null ? $context->correlationId : \Lumen\JsonRpc\Support\CorrelationId::generate();
 
         $this->fireHook(HookPoint::BEFORE_REQUEST, ['correlationId' => $correlationId]);
 
@@ -192,6 +197,10 @@ final class JsonRpcEngine
         }
 
         if ($this->authManager->isEnabled() && $this->isMethodProtected($request->method) && !$context->hasAuth()) {
+            $this->fireHook(HookPoint::ON_ERROR, [
+                'method' => $request->method,
+                'reason' => 'auth_required',
+            ]);
             if (!$request->isNotification) {
                 return Response::error($request->id, new Error(-32001, 'Authentication required'));
             }
@@ -204,18 +213,15 @@ final class JsonRpcEngine
             'context' => $context,
         ]);
 
-        if ($this->schemaValidator !== null) {
-            $schemaError = $this->validateSchema($request, $context);
-            if ($schemaError !== null) {
-                $this->fireHook(HookPoint::ON_ERROR, [
-                    'method' => $request->method,
-                    'reason' => 'schema_validation_failed',
-                ]);
-                if ($request->isNotification) {
-                    return null;
-                }
-                return $schemaError;
+        if ($this->schemaValidator !== null && ($schemaError = $this->validateSchema($request, $context)) !== null) {
+            $this->fireHook(HookPoint::ON_ERROR, [
+                'method' => $request->method,
+                'reason' => 'schema_validation_failed',
+            ]);
+            if ($request->isNotification) {
+                return null;
             }
+            return $schemaError;
         }
 
         if (!$this->middlewarePipeline->isEmpty()) {
@@ -275,6 +281,9 @@ final class JsonRpcEngine
         return $this->executeHandler($request, $context, $hookCtx);
     }
 
+    /**
+     * @param array<string, mixed> $hookCtx
+     */
     private function executeHandler(Request $request, RequestContext $context, array $hookCtx = []): ?Response
     {
         try {
@@ -382,7 +391,7 @@ final class JsonRpcEngine
         $schema = $schemas[$methodName];
         $params = $request->params ?? [];
 
-        $errors = $this->schemaValidator->validate($params, $schema);
+        $errors = $this->schemaValidator?->validate($params, $schema) ?? [];
         if (!empty($errors)) {
             return Response::error($request->id, new Error(
                 -32602,
@@ -394,6 +403,9 @@ final class JsonRpcEngine
         return null;
     }
 
+    /**
+     * @param array<string, string> $headers
+     */
     public function authenticateFromHeaders(array $headers, RequestContext $context): RequestContext
     {
         if (!$this->authManager->isEnabled()) {
@@ -495,6 +507,11 @@ final class JsonRpcEngine
         return $this->fingerprinter;
     }
 
+    public function getRateLimitManager(): RateLimitManager
+    {
+        return $this->rateLimitManager;
+    }
+
     public function getConfig(): Config
     {
         return $this->config;
@@ -522,6 +539,10 @@ final class JsonRpcEngine
         return false;
     }
 
+    /**
+     * @param array<string, mixed> $context
+     * @return array<string, mixed>
+     */
     private function fireHook(HookPoint $point, array $context = []): array
     {
         if ($this->config->get('hooks.enabled', true)) {
@@ -545,16 +566,5 @@ final class JsonRpcEngine
         }
 
         return $decoded;
-    }
-
-    private function getHeaderCaseInsensitive(array $headers, string $name): ?string
-    {
-        $lower = strtolower($name);
-        foreach ($headers as $key => $value) {
-            if (strtolower((string)$key) === $lower) {
-                return $value;
-            }
-        }
-        return null;
     }
 }

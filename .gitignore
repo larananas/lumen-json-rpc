@@ -4,17 +4,34 @@
 # CI / test artifacts
 .phpunit.result.cache
 .phpcs-cache
+infection-log.txt
+coverage.xml
+coverage/
+dist.tar
 
 # Lock file (library — consumers resolve their own versions)
 composer.lock
 
 # Local development artifacts
 /.ai
-/CHANGELOG.md
+.phpactor.json
 
 # Runtime / generated files
 /logs/
 /storage/
 /docs/api/
+/docs-site/
 *.gz
 *.bak
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor / IDE (only if you don't want shared workspace config)
+.vscode/
+.idea/
+
+# Temporary editor files
+*.swp
+*.tmp

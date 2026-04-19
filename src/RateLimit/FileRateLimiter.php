@@ -81,7 +81,8 @@ final class FileRateLimiter implements RateLimiterInterface
 
             ftruncate($fp, 0);
             rewind($fp);
-            fwrite($fp, json_encode($data));
+            $encoded = json_encode($data, JSON_THROW_ON_ERROR);
+            fwrite($fp, $encoded);
             fflush($fp);
 
             return RateLimitResult::allowed(

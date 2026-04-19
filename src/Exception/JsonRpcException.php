@@ -21,6 +21,9 @@ abstract class JsonRpcException extends \RuntimeException
         return $this->data;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
         $error = [

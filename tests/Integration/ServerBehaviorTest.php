@@ -249,13 +249,13 @@ final class ServerBehaviorTest extends TestCase
         $this->assertFalse($fired, 'Hooks should not fire when disabled via config');
     }
 
-    public function testFloatIdPreservedInResponse(): void
+    public function testFloatIdRejectedAsInvalidRequest(): void
     {
         $server = $this->createServer();
         $body = json_encode(['jsonrpc' => '2.0', 'method' => 'system.health', 'id' => 1.5]);
         $response = $server->handle($this->createRequest($body));
         $data = json_decode($response->body, true);
-        $this->assertEquals(1.5, $data['id']);
+        $this->assertEquals(-32600, $data['error']['code']);
     }
 
     public function testNullIdInRequestPreservedInResponse(): void

@@ -9,6 +9,7 @@ use ReflectionClass;
 use ReflectionMethod;
 use ReflectionParameter;
 use ReflectionNamedType;
+use ReflectionUnionType;
 
 final class DocGenerator
 {
@@ -16,9 +17,12 @@ final class DocGenerator
         private readonly HandlerRegistry $registry,
     ) {}
 
+    /**
+     * @return array<int, MethodDoc>
+     */
     public function generate(): array
     {
-        $handlers = $this->registry->discover();
+        $handlers = $this->registry->getHandlers();
         $docs = [];
 
         foreach ($handlers as $methodName => $handlerInfo) {
@@ -28,29 +32,46 @@ final class DocGenerator
         return $docs;
     }
 
+    /**
+     * @param array{class: string, method: string, file: string, descriptor?: bool} $handlerInfo
+     */
     private function documentMethod(string $methodName, array $handlerInfo): MethodDoc
     {
-        if (!class_exists($handlerInfo['class'])) {
+        $descriptor = $this->registry->getDescriptor($methodName);
+        $descriptorMetadata = $descriptor !== null ? ($descriptor->metadata ?? []) : [];
+        $descriptorDescription = $descriptorMetadata['description'] ?? null;
+        $descriptorParams = $descriptorMetadata['params'] ?? null;
+        $descriptorReturnType = $descriptorMetadata['returnType'] ?? null;
+
+        $reflection = null;
+        $method = null;
+        $phpDoc = '';
+        $classDoc = '';
+
+        $classExists = class_exists($handlerInfo['class'])
+            || ($handlerInfo['file'] !== '' && file_exists($handlerInfo['file']));
+
+        if ($classExists && !class_exists($handlerInfo['class']) && $handlerInfo['file'] !== '') {
             require_once $handlerInfo['file'];
         }
 
-        $reflection = new ReflectionClass($handlerInfo['class']);
-        if (!$reflection->hasMethod($handlerInfo['method'])) {
-            return new MethodDoc(name: $methodName);
+        if (class_exists($handlerInfo['class'])) {
+            $reflection = new ReflectionClass($handlerInfo['class']);
+            if ($reflection->hasMethod($handlerInfo['method'])) {
+                $method = $reflection->getMethod($handlerInfo['method']);
+                $phpDoc = $method->getDocComment() ?: '';
+            }
+            $classDoc = $reflection->getDocComment() ?: '';
         }
 
-        $method = $reflection->getMethod($handlerInfo['method']);
-        $phpDoc = $method->getDocComment() ?: '';
-        $classDoc = $reflection->getDocComment() ?: '';
-
-        $description = $this->parseDescription($phpDoc);
-        $params = $this->parseParams($method, $phpDoc);
-        $returnType = $this->parseReturnType($method, $phpDoc);
-        $returnDesc = $this->parseReturnDescription($phpDoc);
-        $requiresAuth = $this->parseAuthRequirement($phpDoc, $classDoc);
-        $errors = $this->parseErrors($phpDoc);
-        $exampleRequest = $this->parseExample($phpDoc, 'request');
-        $exampleResponse = $this->parseExample($phpDoc, 'response');
+        $description = $descriptorDescription ?? ($method !== null ? $this->parseDescription($phpDoc) : '');
+        $params = $descriptorParams ?? ($method !== null ? $this->parseParams($method, $phpDoc) : []);
+        $returnType = $descriptorReturnType ?? ($method !== null ? $this->parseReturnType($method, $phpDoc) : null);
+        $returnDesc = $descriptorMetadata['returnDescription'] ?? ($method !== null ? $this->parseReturnDescription($phpDoc) : '');
+        $requiresAuth = $descriptorMetadata['requiresAuth'] ?? ($phpDoc !== '' ? $this->parseAuthRequirement($phpDoc, $classDoc) : false);
+        $errors = $descriptorMetadata['errors'] ?? ($phpDoc !== '' ? $this->parseErrors($phpDoc) : []);
+        $exampleRequest = $descriptorMetadata['exampleRequest'] ?? ($phpDoc !== '' ? $this->parseExample($phpDoc, 'request') : null);
+        $exampleResponse = $descriptorMetadata['exampleResponse'] ?? ($phpDoc !== '' ? $this->parseExample($phpDoc, 'response') : null);
 
         return new MethodDoc(
             name: $methodName,
@@ -85,6 +106,9 @@ final class DocGenerator
         return implode(' ', $desc);
     }
 
+    /**
+     * @return array<string, array{type: string, description: string, required: bool, default: mixed}>
+     */
     private function parseParams(ReflectionMethod $method, string $doc): array
     {
         $params = [];
@@ -92,7 +116,9 @@ final class DocGenerator
 
         foreach ($method->getParameters() as $param) {
             $name = $param->getName();
-            if ($name === 'context' && ($param->getType()?->getName() ?? '') === \Lumen\JsonRpc\Support\RequestContext::class) {
+            $type = $param->getType();
+            $typeName = ($type instanceof ReflectionNamedType) ? $type->getName() : '';
+            if ($name === 'context' && $typeName === \Lumen\JsonRpc\Support\RequestContext::class) {
                 continue;
             }
 
@@ -121,7 +147,15 @@ final class DocGenerator
             $name = $type->getName();
             return ($type->allowsNull() && $name !== 'mixed' ? '?' : '') . $name;
         }
-        return (string)$type;
+        $unionTypes = [];
+        if ($type instanceof ReflectionUnionType) {
+            foreach ($type->getTypes() as $t) {
+                if ($t instanceof ReflectionNamedType) {
+                    $unionTypes[] = $t->getName();
+                }
+            }
+        }
+        return implode('|', $unionTypes) ?: (string)$type;
     }
 
     private function parseReturnType(ReflectionMethod $method, string $doc): ?string
@@ -154,6 +188,9 @@ final class DocGenerator
             || str_contains($combined, '@auth required');
     }
 
+    /**
+     * @return array<int, array{type?: string, code?: string, description: string}>
+     */
     private function parseErrors(string $doc): array
     {
         $errors = [];
@@ -227,6 +264,9 @@ final class DocGenerator
         return null;
     }
 
+    /**
+     * @return array<string, string>
+     */
     private function extractDocTags(string $doc, string $tag): array
     {
         $result = [];

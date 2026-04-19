@@ -8,14 +8,14 @@ final class RequestContext
 {
     /**
      * @param string $correlationId Unique request identifier
-     * @param array $headers HTTP request headers
+     * @param array<string, string> $headers HTTP request headers
      * @param string $clientIp Client IP address
      * @param string|null $authUserId Authenticated user ID
-     * @param array $authClaims JWT claims
-     * @param array $authRoles User roles
+     * @param array<string, mixed> $authClaims JWT claims
+     * @param array<int, string> $authRoles User roles
      * @param string|null $rawBody Original transport-level body (may be gzipped if Content-Encoding: gzip was used)
      * @param string|null $requestBody Decoded body used for processing (after gzip decompression, if applicable)
-     * @param array $attributes Additional request attributes
+     * @param array<string, mixed> $attributes Additional request attributes
      */
     public function __construct(
         public readonly string $correlationId,
@@ -39,6 +39,10 @@ final class RequestContext
         return in_array($role, $this->authRoles, true);
     }
 
+    /**
+     * @param array<string, mixed> $claims
+     * @param array<int, string> $roles
+     */
     public function withAuth(?string $userId, array $claims = [], array $roles = []): self
     {
         return new self(
