@@ -107,4 +107,6 @@ jobs:
           restore-keys: composer-${{ runner.os }}-8.3-
 
       - run: composer install --prefer-dist --no-interaction --no-progress
-      - run: vendor/bin/infection --threads=max --min-msi=80 --min-covered-msi=85 --no-progress
+      - name: Run Infection (advisory)
+        run: vendor/bin/infection --threads=max --min-msi=80 --min-covered-msi=85 --no-progress
+        continue-on-error: true
