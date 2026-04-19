@@ -97,4 +97,19 @@ final class BatchProcessorTest extends TestCase
         $result = $this->processor->process('not an array');
         $this->assertEquals(-32600, $result->errors[0]->error->code);
     }
+
+    public function testAssociativeInvalidRequestReturnsSingleError(): void
+    {
+        $data = [
+            'jsonrpc' => '1.0',
+            'method' => 'test',
+            'id' => 42,
+        ];
+        $result = $this->processor->process($data);
+        $this->assertFalse($result->isBatch);
+        $this->assertTrue($result->hasErrors());
+        $this->assertFalse($result->hasRequests());
+        $this->assertEquals(-32600, $result->errors[0]->error->code);
+        $this->assertEquals(42, $result->errors[0]->id);
+    }
 }

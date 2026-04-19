@@ -152,4 +152,18 @@ final class MethodResolverTest extends TestCase
         $this->assertNotNull($result);
         $this->assertEquals('App\\Handlers\\User', $result->className);
     }
+
+    public function testSkipsInvalidHandlerPathAndResolvesFromSecondPath(): void
+    {
+        $resolver = new MethodResolver(
+            ['/nonexistent/path/that/does/not/exist', $this->handlerPath],
+            'App\\Handlers\\',
+            '.'
+        );
+
+        $result = $resolver->resolve('system.health');
+        $this->assertNotNull($result);
+        $this->assertEquals('App\\Handlers\\System', $result->className);
+        $this->assertEquals('health', $result->methodName);
+    }
 }
