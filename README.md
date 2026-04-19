@@ -21,6 +21,12 @@ It keeps the boring parts solid — request validation, batching, auth, compress
 
 ---
 
+## 📚 Documentation
+
+Full documentation is available at the documentation website: [https://larananas.github.io/lumen-json-rpc](https://larananas.github.io/lumen-json-rpc).
+
+---
+
 ## 🚀 Why this feels good in real projects
 
 Lumen JSON-RPC is built for developers who want a **real server library**, not a vague protocol toolkit and not a heavy framework abstraction.
