@@ -726,8 +726,6 @@ Release policy:
 - minor releases may add new public capabilities, but internal APIs such as `JsonRpcEngine` may change without backward-compatibility guarantees
 - major releases may change the documented stable public API
 
-Stable public releases follow Semantic Versioning. Compatibility-relevant changes are tracked in the [changelog](https://github.com/larananas/lumen-json-rpc/blob/main/CHANGELOG.md).
-
 ---
 
 ## 🧪 Examples
