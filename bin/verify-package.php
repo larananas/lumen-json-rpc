@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-if (!in_array(PHP_SAPI, ['cli', 'phpdbg'], true)) {
+if (!in_array(PHP_SAPI, ["cli", "phpdbg"], true)) {
     fwrite(STDERR, "This script must be run from the command line.\n");
     exit(1);
 }
@@ -10,8 +10,8 @@ if (!in_array(PHP_SAPI, ['cli', 'phpdbg'], true)) {
 $rootDir = dirname(__DIR__);
 $errors = [];
 
-$gitattributes = file_get_contents($rootDir . '/.gitattributes');
-$gitignore = file_get_contents($rootDir . '/.gitignore');
+$gitattributes = file_get_contents($rootDir . "/.gitattributes");
+$gitignore = file_get_contents($rootDir . "/.gitignore");
 
 if ($gitattributes === false) {
     fwrite(STDERR, "Cannot read .gitattributes\n");
@@ -22,32 +22,31 @@ if ($gitignore === false) {
     exit(1);
 }
 
-preg_match_all('/^(\S+)\s+export-ignore/m', $gitattributes, $matches);
+preg_match_all("/^(\S+)\s+export-ignore/m", $gitattributes, $matches);
 $exportIgnored = $matches[1];
 
 $mustExportIgnore = [
-    '.gitattributes',
-    '.gitignore',
-    '.editorconfig',
-    '.github/',
-    'tests/',
-    'examples/',
-    'docs/',
-    'docs-site/',
-    'phpunit.xml',
-    'phpstan.neon',
-    'infection.json5',
-    '.phpactor.json',
-    '.phpunit.result.cache',
-    'SECURITY.md',
-    'CONTRIBUTING.md',
-    'CHANGELOG.md',
-    '.ai/',
-    'bin/verify-package.php',
-    'bin/check-coverage-driver.php',
-    'bin/check-coverage.php',
-    'bin/build-docs-site.php',
-    'bin/lint-syntax.php',
+    ".gitattributes",
+    ".gitignore",
+    ".editorconfig",
+    ".github/",
+    "tests/",
+    "examples/",
+    "docs/",
+    "docs-site/",
+    "phpunit.xml",
+    "phpstan.neon",
+    "infection.json5",
+    ".phpactor.json",
+    ".phpunit.result.cache",
+    "SECURITY.md",
+    "CONTRIBUTING.md",
+    ".ai/",
+    "bin/verify-package.php",
+    "bin/check-coverage-driver.php",
+    "bin/check-coverage.php",
+    "bin/build-docs-site.php",
+    "bin/lint-syntax.php",
 ];
 
 foreach ($mustExportIgnore as $item) {
@@ -57,13 +56,13 @@ foreach ($mustExportIgnore as $item) {
 }
 
 $mustGitignore = [
-    '/vendor/',
-    '.phpunit.result.cache',
-    'composer.lock',
-    'infection-log.txt',
-    'dist.tar',
-    '/lumen-json-rpc.zip',
-    '.phpactor.json',
+    "/vendor/",
+    ".phpunit.result.cache",
+    "composer.lock",
+    "infection-log.txt",
+    "dist.tar",
+    "/lumen-json-rpc.zip",
+    ".phpactor.json",
 ];
 
 foreach ($mustGitignore as $item) {
@@ -72,28 +71,31 @@ foreach ($mustGitignore as $item) {
     }
 }
 
-if (isTrackedByGit($rootDir, 'composer.lock')) {
-    $errors[] = 'composer.lock must not be committed for this library';
+if (isTrackedByGit($rootDir, "composer.lock")) {
+    $errors[] = "composer.lock must not be committed for this library";
 }
 
 $allowedWeakEncodingFiles = [
-    'src/Protocol/Response.php',
-    'src/Log/LogFormatter.php',
+    "src/Protocol/Response.php",
+    "src/Log/LogFormatter.php",
 ];
 
-$srcDir = $rootDir . '/src';
+$srcDir = $rootDir . "/src";
 if (!is_dir($srcDir)) {
     $errors[] = "src/ directory is missing";
 } else {
     $phpFiles = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($srcDir, RecursiveDirectoryIterator::SKIP_DOTS)
+        new RecursiveDirectoryIterator(
+            $srcDir,
+            RecursiveDirectoryIterator::SKIP_DOTS,
+        ),
     );
     foreach ($phpFiles as $file) {
         if (!$file instanceof SplFileInfo) {
             continue;
         }
 
-        if (!$file->isFile() || $file->getExtension() !== 'php') {
+        if (!$file->isFile() || $file->getExtension() !== "php") {
             continue;
         }
         $content = file_get_contents($file->getPathname());
@@ -101,49 +103,54 @@ if (!is_dir($srcDir)) {
             continue;
         }
 
-        $fullPath = (string) str_replace('\\', '/', $file->getPathname());
-        $rootNormalized = (string) str_replace('\\', '/', $rootDir) . '/';
-        $relativePath = (string) str_replace($rootNormalized, '', $fullPath);
+        $fullPath = (string) str_replace("\\", "/", $file->getPathname());
+        $rootNormalized = (string) str_replace("\\", "/", $rootDir) . "/";
+        $relativePath = (string) str_replace($rootNormalized, "", $fullPath);
 
         if (in_array($relativePath, $allowedWeakEncodingFiles, true)) {
             continue;
         }
 
-        if (preg_match('/json_encode\([^)]*\)\s*\?\?/', $content)) {
+        if (preg_match("/json_encode\([^)]*\)\s*\?\?/", $content)) {
             $errors[] = "Silent json_encode ?? fallback in {$relativePath} (only allowed in Response.php and LogFormatter.php)";
         }
 
-        if (preg_match('/json_encode\([^)]*\)\s*\?:/', $content)) {
+        if (preg_match("/json_encode\([^)]*\)\s*\?:/", $content)) {
             $errors[] = "Silent json_encode ?: fallback in {$relativePath} (only allowed in Response.php and LogFormatter.php)";
         }
 
-        if (preg_match('/\$encoded\s*=\s*json_encode\([^)]*\)\s*;.*if\s*\(\s*\$encoded\s*===\s*false\s*\)/s', $content)) {
+        if (
+            preg_match(
+                '/\$encoded\s*=\s*json_encode\([^)]*\)\s*;.*if\s*\(\s*\$encoded\s*===\s*false\s*\)/s',
+                $content,
+            )
+        ) {
             $errors[] = "Explicit false-check json_encode fallback in {$relativePath} (only allowed in Response.php and LogFormatter.php)";
         }
 
-        if (preg_match('/json_encode\([^)]*\)\s*===\s*false/', $content)) {
+        if (preg_match("/json_encode\([^)]*\)\s*===\s*false/", $content)) {
             $errors[] = "json_encode === false comparison in {$relativePath} (only allowed in Response.php and LogFormatter.php)";
         }
 
-        if (preg_match('/json_encode\([^)]*\)\s*!==\s*false/', $content)) {
+        if (preg_match("/json_encode\([^)]*\)\s*!==\s*false/", $content)) {
             $errors[] = "json_encode !== false comparison in {$relativePath} (only allowed in Response.php and LogFormatter.php)";
         }
     }
 }
 
 $requiredFiles = [
-    'composer.json',
-    'LICENSE',
-    'README.md',
-    '.gitattributes',
-    '.gitignore',
-    'bin/generate-docs.php',
-    'src/',
+    "composer.json",
+    "LICENSE",
+    "README.md",
+    ".gitattributes",
+    ".gitignore",
+    "bin/generate-docs.php",
+    "src/",
 ];
 
 foreach ($requiredFiles as $file) {
-    $path = $rootDir . '/' . $file;
-    if (str_ends_with($file, '/')) {
+    $path = $rootDir . "/" . $file;
+    if (str_ends_with($file, "/")) {
         if (!is_dir($path)) {
             $errors[] = "Required directory missing: {$file}";
         }
@@ -157,7 +164,7 @@ foreach ($requiredFiles as $file) {
 /** @var list<string> $declaredBins */
 $declaredBins = [];
 
-$composerContent = file_get_contents($rootDir . '/composer.json');
+$composerContent = file_get_contents($rootDir . "/composer.json");
 if ($composerContent === false) {
     $errors[] = "Cannot read composer.json";
 } else {
@@ -165,40 +172,45 @@ if ($composerContent === false) {
     if (!is_array($composerJson)) {
         $errors[] = "composer.json is not valid JSON";
     } else {
-        $requiredComposerKeys = ['name', 'description', 'type', 'license', 'require', 'autoload'];
+        $requiredComposerKeys = [
+            "name",
+            "description",
+            "type",
+            "license",
+            "require",
+            "autoload",
+        ];
         foreach ($requiredComposerKeys as $key) {
             if (!isset($composerJson[$key])) {
                 $errors[] = "composer.json missing required key: {$key}";
             }
         }
 
-        if (($composerJson['type'] ?? '') !== 'library') {
+        if (($composerJson["type"] ?? "") !== "library") {
             $errors[] = "composer.json type must be 'library'";
         }
 
-        if (isset($composerJson['scripts']['docs:build'])) {
-            $errors[] = "composer.json must not advertise docs:build because the docs-site builder is export-ignored";
+        if (isset($composerJson["scripts"]["docs:build"])) {
+            $errors[] =
+                "composer.json must not advertise docs:build because the docs-site builder is export-ignored";
         }
 
-        if (!file_exists($rootDir . '/CHANGELOG.md')) {
-            $errors[] = 'CHANGELOG.md must exist because README advertises a changelog';
-        }
-
-        $rawBins = $composerJson['bin'] ?? [];
+        $rawBins = $composerJson["bin"] ?? [];
         if (!is_array($rawBins)) {
-            $errors[] = 'composer.json bin must be an array when present';
+            $errors[] = "composer.json bin must be an array when present";
             $rawBins = [];
         }
 
         foreach ($rawBins as $binPath) {
-            if (!is_string($binPath) || $binPath === '') {
-                $errors[] = 'composer.json bin entries must be non-empty strings';
+            if (!is_string($binPath) || $binPath === "") {
+                $errors[] =
+                    "composer.json bin entries must be non-empty strings";
                 continue;
             }
 
             $declaredBins[] = $binPath;
 
-            if (!file_exists($rootDir . '/' . $binPath)) {
+            if (!file_exists($rootDir . "/" . $binPath)) {
                 $errors[] = "composer.json bin target is missing: {$binPath}";
             }
 
@@ -212,9 +224,9 @@ if ($composerContent === false) {
 verifyReadmePackageLinks($rootDir, $errors);
 verifyDocsGeneratorDefaults($rootDir, $errors);
 
-$junkFiles = ['.phpcs-cache'];
+$junkFiles = [".phpcs-cache"];
 foreach ($junkFiles as $junk) {
-    if (file_exists($rootDir . '/' . $junk)) {
+    if (file_exists($rootDir . "/" . $junk)) {
         $errors[] = "Junk file present in working tree: {$junk}";
     }
 }
@@ -244,14 +256,18 @@ function verifyArchive(string $rootDir, array $declaredBins): array
 {
     $errors = [];
 
-    $isGitRepo = is_dir($rootDir . '/.git');
+    $isGitRepo = is_dir($rootDir . "/.git");
     if (!$isGitRepo) {
-        $errors[] = "ARCHIVE: Not a git repository — cannot build archive for inspection";
+        $errors[] =
+            "ARCHIVE: Not a git repository — cannot build archive for inspection";
         return $errors;
     }
 
-    $tmpDir = sys_get_temp_dir() . '/lumen-jsonrpc-pkg-verify-' . bin2hex(random_bytes(4));
-    $archiveFile = $tmpDir . '.tar';
+    $tmpDir =
+        sys_get_temp_dir() .
+        "/lumen-jsonrpc-pkg-verify-" .
+        bin2hex(random_bytes(4));
+    $archiveFile = $tmpDir . ".tar";
 
     @mkdir($tmpDir, 0755, true);
 
@@ -262,76 +278,92 @@ function verifyArchive(string $rootDir, array $declaredBins): array
         }
 
         exec(
-            'git -C ' . escapeshellarg($rootDir)
-            . ' archive --worktree-attributes --format=tar --output=' . escapeshellarg($archiveFile)
-            . ' ' . escapeshellarg($archiveTreeish) . ' 2>&1',
+            "git -C " .
+                escapeshellarg($rootDir) .
+                " archive --worktree-attributes --format=tar --output=" .
+                escapeshellarg($archiveFile) .
+                " " .
+                escapeshellarg($archiveTreeish) .
+                " 2>&1",
             $output,
             $exitCode,
         );
         if ($exitCode !== 0 || !file_exists($archiveFile)) {
-            $errors[] = "ARCHIVE: Failed to create git archive: " . implode("\n", $output);
+            $errors[] =
+                "ARCHIVE: Failed to create git archive: " .
+                implode("\n", $output);
             return $errors;
         }
 
-        exec('tar -xf ' . escapeshellarg($archiveFile) . ' -C ' . escapeshellarg($tmpDir) . ' 2>&1', $extractOutput, $extractExit);
+        exec(
+            "tar -xf " .
+                escapeshellarg($archiveFile) .
+                " -C " .
+                escapeshellarg($tmpDir) .
+                " 2>&1",
+            $extractOutput,
+            $extractExit,
+        );
         if ($extractExit !== 0) {
-            $errors[] = "ARCHIVE: Failed to extract archive: " . implode("\n", $extractOutput);
+            $errors[] =
+                "ARCHIVE: Failed to extract archive: " .
+                implode("\n", $extractOutput);
             return $errors;
         }
 
         $forbiddenInArchive = [
-            '.git',
-            '.github',
-            'tests',
-            'phpunit.xml',
-            'phpstan.neon',
-            'phpstan.neon.dist',
-            'infection.json5',
-            '.phpunit.result.cache',
-            '.phpactor.json',
-            'CONTRIBUTING.md',
-            'CHANGELOG.md',
-            'composer.lock',
-            'SECURITY.md',
-            '.ai',
-            'IMPLEMENTATION_REPORT.md',
-            'bin/verify-package.php',
-            'bin/check-coverage-driver.php',
-            'bin/check-coverage.php',
-            'bin/build-docs-site.php',
-            'bin/lint-syntax.php',
-            'docs',
-            'docs-site',
-            'examples',
+            ".git",
+            ".github",
+            "tests",
+            "phpunit.xml",
+            "phpstan.neon",
+            "phpstan.neon.dist",
+            "infection.json5",
+            ".phpunit.result.cache",
+            ".phpactor.json",
+            "CONTRIBUTING.md",
+            "composer.lock",
+            "SECURITY.md",
+            ".ai",
+            "IMPLEMENTATION_REPORT.md",
+            "bin/verify-package.php",
+            "bin/check-coverage-driver.php",
+            "bin/check-coverage.php",
+            "bin/build-docs-site.php",
+            "bin/lint-syntax.php",
+            "docs",
+            "docs-site",
+            "examples",
         ];
 
         foreach ($forbiddenInArchive as $forbidden) {
-            if (file_exists($tmpDir . '/' . $forbidden) || is_dir($tmpDir . '/' . $forbidden)) {
+            if (
+                file_exists($tmpDir . "/" . $forbidden) ||
+                is_dir($tmpDir . "/" . $forbidden)
+            ) {
                 $errors[] = "ARCHIVE: Forbidden file/directory present in package: {$forbidden}";
             }
         }
 
-        $mustBeInArchive = [
-            'composer.json',
-            'LICENSE',
-            'README.md',
-            'src/',
-        ];
+        $mustBeInArchive = ["composer.json", "LICENSE", "README.md", "src/"];
 
         foreach ($declaredBins as $binPath) {
             $mustBeInArchive[] = $binPath;
         }
 
         foreach ($mustBeInArchive as $required) {
-            if (!file_exists($tmpDir . '/' . $required)) {
+            if (!file_exists($tmpDir . "/" . $required)) {
                 $errors[] = "ARCHIVE: Required file/directory missing from package: {$required}";
             }
         }
 
-        $srcDir = $tmpDir . '/src';
+        $srcDir = $tmpDir . "/src";
         if (is_dir($srcDir)) {
             $srcFiles = new RecursiveIteratorIterator(
-                new RecursiveDirectoryIterator($srcDir, RecursiveDirectoryIterator::SKIP_DOTS)
+                new RecursiveDirectoryIterator(
+                    $srcDir,
+                    RecursiveDirectoryIterator::SKIP_DOTS,
+                ),
             );
             $phpCount = 0;
             foreach ($srcFiles as $f) {
@@ -339,7 +371,7 @@ function verifyArchive(string $rootDir, array $declaredBins): array
                     continue;
                 }
 
-                if ($f->isFile() && $f->getExtension() === 'php') {
+                if ($f->isFile() && $f->getExtension() === "php") {
                     $phpCount++;
                 }
             }
@@ -348,17 +380,25 @@ function verifyArchive(string $rootDir, array $declaredBins): array
             }
         }
 
-        $archiveComposerContent = @file_get_contents($tmpDir . '/composer.json');
+        $archiveComposerContent = @file_get_contents(
+            $tmpDir . "/composer.json",
+        );
         if ($archiveComposerContent !== false) {
             $archiveComposer = json_decode($archiveComposerContent, true);
             if (!is_array($archiveComposer)) {
-                $errors[] = "ARCHIVE: composer.json in archive is not valid JSON";
-            } elseif (($archiveComposer['type'] ?? '') !== 'library') {
+                $errors[] =
+                    "ARCHIVE: composer.json in archive is not valid JSON";
+            } elseif (($archiveComposer["type"] ?? "") !== "library") {
                 $errors[] = "ARCHIVE: composer.json type must be 'library'";
             }
         }
 
-        fwrite(STDOUT, "  Archive inspection: " . count($errors) . " archive issues found\n");
+        fwrite(
+            STDOUT,
+            "  Archive inspection: " .
+                count($errors) .
+                " archive issues found\n",
+        );
     } finally {
         $cleanupFiles = [$archiveFile];
         $cleanupDirs = [$tmpDir];
@@ -384,28 +424,42 @@ function resolveArchiveTreeish(string $rootDir, array &$errors): ?string
 {
     $output = [];
     $exitCode = 0;
-    exec('git -C ' . escapeshellarg($rootDir) . ' stash create "package-verify" 2>&1', $output, $exitCode);
+    exec(
+        "git -C " .
+            escapeshellarg($rootDir) .
+            ' stash create "package-verify" 2>&1',
+        $output,
+        $exitCode,
+    );
     if ($exitCode !== 0) {
-        $errors[] = 'ARCHIVE: Failed to create tracked worktree snapshot: ' . implode("\n", $output);
+        $errors[] =
+            "ARCHIVE: Failed to create tracked worktree snapshot: " .
+            implode("\n", $output);
         return null;
     }
 
     $treeish = trim(implode("\n", $output));
-    if ($treeish !== '') {
+    if ($treeish !== "") {
         return $treeish;
     }
 
     $headOutput = [];
     $headExitCode = 0;
-    exec('git -C ' . escapeshellarg($rootDir) . ' rev-parse HEAD 2>&1', $headOutput, $headExitCode);
+    exec(
+        "git -C " . escapeshellarg($rootDir) . " rev-parse HEAD 2>&1",
+        $headOutput,
+        $headExitCode,
+    );
     if ($headExitCode !== 0) {
-        $errors[] = 'ARCHIVE: Failed to resolve HEAD for archive verification: ' . implode("\n", $headOutput);
+        $errors[] =
+            "ARCHIVE: Failed to resolve HEAD for archive verification: " .
+            implode("\n", $headOutput);
         return null;
     }
 
     $head = trim(implode("\n", $headOutput));
-    if ($head === '') {
-        $errors[] = 'ARCHIVE: Could not determine an archive treeish';
+    if ($head === "") {
+        $errors[] = "ARCHIVE: Could not determine an archive treeish";
         return null;
     }
 
@@ -418,8 +472,11 @@ function removeDir(string $dir): void
         return;
     }
     $items = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
-        RecursiveIteratorIterator::CHILD_FIRST
+        new RecursiveDirectoryIterator(
+            $dir,
+            RecursiveDirectoryIterator::SKIP_DOTS,
+        ),
+        RecursiveIteratorIterator::CHILD_FIRST,
     );
     foreach ($items as $item) {
         if (!$item instanceof SplFileInfo) {
@@ -440,18 +497,25 @@ function removeDir(string $dir): void
  */
 function verifyReadmePackageLinks(string $rootDir, array &$errors): void
 {
-    $readme = @file_get_contents($rootDir . '/README.md');
+    $readme = @file_get_contents($rootDir . "/README.md");
     if ($readme === false) {
-        $errors[] = 'Cannot read README.md';
+        $errors[] = "Cannot read README.md";
         return;
     }
 
-    if (preg_match('/\]\((docs\/|examples\/|\.github\/|CHANGELOG\.md|SECURITY\.md|CONTRIBUTING\.md)/', $readme) === 1) {
-        $errors[] = 'README.md must not contain package-broken relative links to export-ignored docs, examples, or policies';
+    if (
+        preg_match(
+            "/\]\((docs\/|examples\/|\.github\/|SECURITY\.md|CONTRIBUTING\.md)/",
+            $readme,
+        ) === 1
+    ) {
+        $errors[] =
+            "README.md must not contain package-broken relative links to export-ignored docs, examples, or policies";
     }
 
     if (preg_match('/<img[^>]+src="\.github\//', $readme) === 1) {
-        $errors[] = 'README.md must not embed images from export-ignored .github assets';
+        $errors[] =
+            "README.md must not embed images from export-ignored .github assets";
     }
 }
 
@@ -460,27 +524,32 @@ function verifyReadmePackageLinks(string $rootDir, array &$errors): void
  */
 function verifyDocsGeneratorDefaults(string $rootDir, array &$errors): void
 {
-    $script = @file_get_contents($rootDir . '/bin/generate-docs.php');
+    $script = @file_get_contents($rootDir . "/bin/generate-docs.php");
     if ($script === false) {
-        $errors[] = 'Cannot read bin/generate-docs.php';
+        $errors[] = "Cannot read bin/generate-docs.php";
         return;
     }
 
-    if (str_contains($script, '/../examples/')) {
-        $errors[] = 'bin/generate-docs.php must not default to an export-ignored example config';
+    if (str_contains($script, "/../examples/")) {
+        $errors[] =
+            "bin/generate-docs.php must not default to an export-ignored example config";
     }
 }
 
 function isTrackedByGit(string $rootDir, string $path): bool
 {
-    if (!is_dir($rootDir . '/.git')) {
+    if (!is_dir($rootDir . "/.git")) {
         return false;
     }
 
     $output = [];
     $exitCode = 0;
     exec(
-        'git -C ' . escapeshellarg($rootDir) . ' ls-files --error-unmatch -- ' . escapeshellarg($path) . ' 2>&1',
+        "git -C " .
+            escapeshellarg($rootDir) .
+            " ls-files --error-unmatch -- " .
+            escapeshellarg($path) .
+            " 2>&1",
         $output,
         $exitCode,
     );

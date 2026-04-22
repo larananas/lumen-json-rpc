@@ -61,7 +61,7 @@ The supported public surface is centered on `JsonRpcServer` and its documented c
 
 `JsonRpcServer::getEngine()` remains an internal escape hatch and is not covered by backward-compatibility guarantees between minor releases.
 
-The documented stable surface is guarded by `tests/Integration/StablePublicApiTest.php`. Compatibility-sensitive changes should update that test, the docs, and the changelog deliberately.
+The documented stable surface is guarded by `tests/Integration/StablePublicApiTest.php`. Compatibility-sensitive changes should update that test and the docs deliberately.
 
 Release policy follows Semantic Versioning for the stable public API surface: patch releases may fix internals and packaging, minor releases may add stable API, and major releases may break the documented stable surface.
 
