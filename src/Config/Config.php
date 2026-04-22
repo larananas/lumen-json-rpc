@@ -26,6 +26,7 @@ class Config
         if (!is_array($data)) {
             throw new \RuntimeException("Configuration file must return an array, got " . gettype($data) . " in: {$path}");
         }
+        /** @var array<string, mixed> $data */
         return new self($data);
     }
 

@@ -55,9 +55,11 @@ final class RateLimitManager
 
     private function resolveKey(RequestContext $context): string
     {
+        $tokenId = $context->authClaims['jti'] ?? null;
+
         return match ($this->strategy) {
             'user' => $context->authUserId ?? 'anonymous_' . $context->clientIp,
-            'token' => ($context->authClaims['jti'] ?? '') ?: $context->clientIp,
+            'token' => is_string($tokenId) && $tokenId !== '' ? $tokenId : $context->clientIp,
             default => $context->clientIp,
         };
     }

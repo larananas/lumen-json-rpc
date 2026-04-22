@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-if (php_sapi_name() !== "cli") {
+if (!in_array(PHP_SAPI, ['cli', 'phpdbg'], true)) {
     fwrite(STDERR, "This script must be run from the command line.\n");
     exit(1);
 }
@@ -13,7 +13,7 @@ $cloverPath = $rootDir . "/coverage.xml";
 if (!file_exists($cloverPath)) {
     fwrite(
         STDERR,
-        "coverage.xml not found. Run `composer test:coverage` with XDebug or PCOV enabled first.\n",
+        "coverage.xml not found. Run `composer test:coverage` with Xdebug coverage mode or PCOV enabled first.\n",
     );
     exit(1);
 }

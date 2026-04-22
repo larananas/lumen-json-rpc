@@ -27,6 +27,7 @@ class System
      * Check server health status.
      *
      * @return array status
+     * @result-schema {"type":"object","required":["status","timestamp"],"properties":{"status":{"type":"string"},"timestamp":{"type":"string"}},"additionalProperties":false}
      * @example-request {"jsonrpc": "2.0", "method": "system.health", "id": 1}
      * @example-response {"status": "ok", "timestamp": "2025-01-01T00:00:00Z"}
      */
@@ -42,6 +43,7 @@ class System
      * Get server version information.
      *
      * @return array version info
+     * @result-schema {"type":"object","required":["version","protocol"],"properties":{"version":{"type":"string"},"protocol":{"type":"string"}},"additionalProperties":false}
      * @example-request {"jsonrpc": "2.0", "method": "system.version", "id": 1}
      * @example-response {"version": "1.0.0", "protocol": "2.0"}
      */
@@ -58,6 +60,7 @@ class System
      * List all available JSON-RPC methods.
      *
      * @return string[] method names
+     * @result-schema {"type":"array","items":{"type":"string"}}
      * @example-request {"jsonrpc": "2.0", "method": "system.methods", "id": 1}
      * @example-response ["system.health", "system.version", "system.methods"]
      */

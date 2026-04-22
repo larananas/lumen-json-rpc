@@ -47,6 +47,26 @@ final class OpenRpcDescriptorIntegrationTest extends TestCase
         $this->assertContains('system.health', $methodNames);
     }
 
+    public function testAutoDiscoveredDocblockResultSchemaFlowsIntoOpenRpc(): void
+    {
+        $docs = (new DocGenerator($this->server->getRegistry()))->generate();
+        $spec = json_decode((new OpenRpcGenerator())->generate($docs, 'Test API', '2.0.0'), true);
+
+        $healthMethod = null;
+        foreach ($spec['methods'] as $method) {
+            if ($method['name'] === 'system.health') {
+                $healthMethod = $method;
+                break;
+            }
+        }
+
+        $this->assertNotNull($healthMethod);
+        $this->assertSame('object', $healthMethod['result']['schema']['type']);
+        $this->assertFalse($healthMethod['result']['schema']['additionalProperties']);
+        $this->assertSame('string', $healthMethod['result']['schema']['properties']['status']['type']);
+        $this->assertSame('string', $healthMethod['result']['schema']['properties']['timestamp']['type']);
+    }
+
     public function testDescriptorMethodsAppearInOpenRpc(): void
     {
         $this->server->getRegistry()->registerDescriptor(
@@ -62,6 +82,15 @@ final class OpenRpcDescriptorIntegrationTest extends TestCase
                     ],
                     'returnType' => 'int',
                     'returnDescription' => 'Sum of a and b',
+                    'resultSchema' => [
+                        'type' => 'object',
+                        'required' => ['sum'],
+                        'properties' => [
+                            'sum' => ['type' => 'integer'],
+                            'traceId' => ['type' => 'string'],
+                        ],
+                        'additionalProperties' => false,
+                    ],
                     'requiresAuth' => false,
                     'errors' => [
                         ['code' => -32602, 'description' => 'Invalid parameters'],
@@ -92,6 +121,9 @@ final class OpenRpcDescriptorIntegrationTest extends TestCase
         $this->assertTrue($mathMethod['params'][0]['required']);
         $this->assertSame('b', $mathMethod['params'][1]['name']);
         $this->assertArrayHasKey('result', $mathMethod);
+        $this->assertSame('object', $mathMethod['result']['schema']['type']);
+        $this->assertSame('integer', $mathMethod['result']['schema']['properties']['sum']['type']);
+        $this->assertFalse($mathMethod['result']['schema']['additionalProperties']);
         $this->assertArrayHasKey('errors', $mathMethod);
         $this->assertSame(-32602, $mathMethod['errors'][0]['code']);
         $this->assertSame('Invalid parameters', $mathMethod['errors'][0]['message']);
@@ -108,17 +140,30 @@ final class OpenRpcDescriptorIntegrationTest extends TestCase
         $this->assertSame('1.3.2', $spec['openrpc']);
     }
 
+    public function testOpenRpcOmitsServersBlockWhenNoServerUrlProvided(): void
+    {
+        $docGenerator = new DocGenerator($this->server->getRegistry());
+        $docs = $docGenerator->generate();
+        $openRpc = new OpenRpcGenerator();
+        $json = $openRpc->generate($docs, 'Test API', '1.0.0');
+        $spec = json_decode($json, true);
+
+        $this->assertArrayNotHasKey('servers', $spec);
+    }
+
     public function testOpenRpcInfoBlockHasRequiredFields(): void
     {
         $docGenerator = new DocGenerator($this->server->getRegistry());
         $docs = $docGenerator->generate();
         $openRpc = new OpenRpcGenerator();
-        $json = $openRpc->generate($docs, 'Custom Title', '3.0.0', 'Custom description');
+        $json = $openRpc->generate($docs, 'Custom Title', '3.0.0', 'Custom description', 'https://api.example.test/rpc');
         $spec = json_decode($json, true);
 
         $this->assertSame('Custom Title', $spec['info']['title']);
         $this->assertSame('3.0.0', $spec['info']['version']);
         $this->assertSame('Custom description', $spec['info']['description']);
+        $this->assertSame('Custom Title', $spec['servers'][0]['name']);
+        $this->assertSame('https://api.example.test/rpc', $spec['servers'][0]['url']);
     }
 
     public function testMixedAutoDiscoveryAndDescriptors(): void
@@ -158,5 +203,39 @@ final class OpenRpcDescriptorIntegrationTest extends TestCase
             $this->assertArrayHasKey('name', $method['result']);
             $this->assertArrayHasKey('schema', $method['result']);
         }
+    }
+
+    public function testSchemaProviderMetadataFlowsIntoOpenRpc(): void
+    {
+        $config = new Config([
+            'handlers' => [
+                'paths' => [realpath(__DIR__ . '/../Fixtures') ?: __DIR__ . '/../Fixtures'],
+                'namespace' => 'Lumen\\JsonRpc\\Tests\\Fixtures\\',
+            ],
+            'logging' => ['enabled' => false],
+            'health' => ['enabled' => false],
+            'auth' => ['enabled' => false],
+            'rate_limit' => ['enabled' => false],
+            'response_fingerprint' => ['enabled' => false],
+        ]);
+
+        $server = new JsonRpcServer($config);
+        $docs = (new DocGenerator($server->getRegistry()))->generate();
+        $spec = json_decode((new OpenRpcGenerator())->generate($docs, 'Test API', '1.0.0'), true);
+
+        $method = null;
+        foreach ($spec['methods'] as $candidate) {
+            if ($candidate['name'] === 'validatedhandler.create') {
+                $method = $candidate;
+                break;
+            }
+        }
+
+        $this->assertNotNull($method);
+        $this->assertSame('by-name', $method['paramStructure']);
+        $this->assertFalse($method['x-jsonrpc-requestSchema']['additionalProperties']);
+        $this->assertSame('string', $method['params'][0]['schema']['type']);
+        $this->assertSame('array', $method['params'][1]['schema']['type']);
+        $this->assertSame(1, $method['params'][1]['schema']['minItems']);
     }
 }

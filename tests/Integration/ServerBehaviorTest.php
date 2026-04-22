@@ -8,6 +8,7 @@ use Lumen\JsonRpc\Http\HttpRequest;
 use Lumen\JsonRpc\Server\JsonRpcServer;
 use Lumen\JsonRpc\Support\HookPoint;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 final class ServerBehaviorTest extends TestCase
 {
@@ -22,6 +23,16 @@ final class ServerBehaviorTest extends TestCase
     {
         $server = $this->createServer(['health' => ['enabled' => false]]);
         $response = $server->handle($this->createRequest('', 'PUT'));
+        $this->assertEquals(405, $response->statusCode);
+        $this->assertArrayHasKey('Allow', $response->headers);
+        $this->assertEquals('POST', $response->headers['Allow']);
+    }
+
+    public function testHttpMethodNotAllowedIncludesGetWhenHealthEnabled(): void
+    {
+        $server = $this->createServer(['health' => ['enabled' => true]]);
+        $response = $server->handle($this->createRequest('', 'PUT'));
+
         $this->assertEquals(405, $response->statusCode);
         $this->assertArrayHasKey('Allow', $response->headers);
         $this->assertEquals('POST, GET', $response->headers['Allow']);
@@ -247,6 +258,56 @@ final class ServerBehaviorTest extends TestCase
         $server->handle($this->createRequest($body));
 
         $this->assertFalse($fired, 'Hooks should not fire when disabled via config');
+    }
+
+    public function testHandleJsonIsolatesHookExceptionsByDefault(): void
+    {
+        $server = $this->createServer();
+        $continued = false;
+
+        $server->getHooks()->register(HookPoint::BEFORE_REQUEST, static function (): array {
+            throw new RuntimeException('before request hook failed');
+        });
+        $server->getHooks()->register(HookPoint::BEFORE_REQUEST, function () use (&$continued): array {
+            $continued = true;
+            return [];
+        });
+
+        $result = $server->handleJson(json_encode(['jsonrpc' => '2.0', 'method' => 'system.health', 'id' => 1]));
+        $data = json_decode($result, true);
+
+        $this->assertTrue($continued);
+        $this->assertSame('2.0', $data['jsonrpc']);
+        $this->assertArrayHasKey('result', $data);
+    }
+
+    public function testHandleJsonCanPropagateHookExceptionsWhenIsolationDisabled(): void
+    {
+        $server = $this->createServer(['hooks' => ['isolate_exceptions' => false]]);
+
+        $server->getHooks()->register(HookPoint::BEFORE_REQUEST, static function (): array {
+            throw new RuntimeException('before request hook failed');
+        });
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('before request hook failed');
+
+        $server->handleJson(json_encode(['jsonrpc' => '2.0', 'method' => 'system.health', 'id' => 1]));
+    }
+
+    public function testHandleCanPropagateHookExceptionsWhenIsolationDisabled(): void
+    {
+        $server = $this->createServer(['hooks' => ['isolate_exceptions' => false]]);
+
+        $server->getHooks()->register(HookPoint::BEFORE_REQUEST, static function (): array {
+            throw new RuntimeException('http hook failed');
+        });
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('http hook failed');
+
+        $body = json_encode(['jsonrpc' => '2.0', 'method' => 'system.health', 'id' => 1]);
+        $server->handle($this->createRequest($body));
     }
 
     public function testFloatIdRejectedAsInvalidRequest(): void

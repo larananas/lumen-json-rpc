@@ -107,7 +107,7 @@ final class CustomRateLimiterTest extends TestCase
         $this->assertEquals('ok', $decoded['result']['status']);
     }
 
-    public function testSwapPathViaEngineGetter(): void
+    public function testSwapPathViaStableServerApi(): void
     {
         $config = $this->createConfig();
         $server = new JsonRpcServer($config);
@@ -127,7 +127,7 @@ final class CustomRateLimiterTest extends TestCase
             }
         };
 
-        $server->getEngine()->getRateLimitManager()->setLimiter($customLimiter);
+        $server->setRateLimiter($customLimiter);
 
         $json = $server->handleJson(
             '{"jsonrpc":"2.0","method":"system.health","id":1}'

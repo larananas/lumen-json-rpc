@@ -14,6 +14,7 @@ final class OpenRpcGenerator
         string $serverName = 'JSON-RPC 2.0 API',
         string $version = '1.0.0',
         string $description = '',
+        string $serverUrl = '',
     ): string {
         $spec = [
             'openrpc' => '1.3.2',
@@ -22,11 +23,14 @@ final class OpenRpcGenerator
                 'version' => $version,
                 'description' => $description,
             ],
-            'servers' => [
-                ['name' => 'default', 'url' => 'http://localhost/'],
-            ],
             'methods' => [],
         ];
+
+        if ($serverUrl !== '') {
+            $spec['servers'] = [
+                ['name' => $serverName, 'url' => $serverUrl],
+            ];
+        }
 
         foreach ($docs as $doc) {
             $spec['methods'][] = $this->methodToOpenRpc($doc);
@@ -54,6 +58,14 @@ final class OpenRpcGenerator
             $method['params'][] = $this->buildParam($name, $param);
         }
 
+        if ($doc->requestSchema !== null) {
+            $method['x-jsonrpc-requestSchema'] = $doc->requestSchema;
+
+            if (($doc->requestSchema['type'] ?? null) === 'object') {
+                $method['paramStructure'] = 'by-name';
+            }
+        }
+
         if ($doc->requiresAuth) {
             $method['x-requiresAuth'] = true;
         }
@@ -72,10 +84,11 @@ final class OpenRpcGenerator
 
         if ($doc->exampleRequest !== null) {
             $decoded = json_decode($doc->exampleRequest, true);
-            if (json_last_error() === JSON_ERROR_NONE) {
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
                 $rawParams = $decoded['params'] ?? $decoded;
                 $params = [];
                 if (is_array($rawParams)) {
+                    /** @var array<int|string, mixed> $rawParams */
                     if ($this->isAssociative($rawParams)) {
                         foreach ($rawParams as $key => $val) {
                             $params[] = ['name' => (string)$key, 'value' => $val];
@@ -95,7 +108,7 @@ final class OpenRpcGenerator
 
         if ($doc->exampleResponse !== null) {
             $decoded = json_decode($doc->exampleResponse, true);
-            if (json_last_error() === JSON_ERROR_NONE) {
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
                 $value = $decoded['result'] ?? $decoded;
                 $examples[] = [
                     'name' => 'response-example',
@@ -118,14 +131,18 @@ final class OpenRpcGenerator
      */
     private function buildParam(string $name, array $param): array
     {
+        $schema = isset($param['schema']) && is_array($param['schema'])
+            ? $param['schema']
+            : $this->phpTypeToJsonSchema(is_string($param['type'] ?? null) ? $param['type'] : 'mixed');
+
         $p = [
             'name' => $name,
-            'description' => (string)($param['description'] ?? ''),
+            'description' => is_string($param['description'] ?? null) ? $param['description'] : '',
             'required' => ($param['required'] ?? false) === true,
-            'schema' => $this->phpTypeToJsonSchema((string)($param['type'] ?? 'mixed')),
+            'schema' => $schema,
         ];
 
-        if (!$p['required'] && array_key_exists('default', $param) && $param['default'] !== null) {
+        if (!$p['required'] && array_key_exists('default', $param) && $param['default'] !== null && !array_key_exists('default', $schema)) {
             $p['schema']['default'] = $param['default'];
         }
 
@@ -137,11 +154,12 @@ final class OpenRpcGenerator
      */
     private function buildResult(MethodDoc $doc): array
     {
-        $returnType = $doc->returnType ?? 'mixed';
+        $schema = $doc->resultSchema ?? $this->phpTypeToJsonSchema($doc->returnType ?? 'mixed');
+
         return [
             'name' => 'result',
             'description' => $doc->returnDescription ?? '',
-            'schema' => $this->phpTypeToJsonSchema($returnType),
+            'schema' => $schema,
         ];
     }
 

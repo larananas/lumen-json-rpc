@@ -39,6 +39,8 @@ final class SchemaValidator
         }
 
         $errors = [];
+        $enum = $schema['enum'] ?? null;
+        $type = $schema['type'] ?? null;
 
         if (isset($schema['const']) && $data !== $schema['const']) {
             $expected = var_export($schema['const'], true);
@@ -46,27 +48,30 @@ final class SchemaValidator
             $errors[] = "Value must be {$expected}, got {$actual}";
         }
 
-        if (isset($schema['enum']) && !in_array($data, $schema['enum'], true)) {
-            $allowed = implode(', ', array_map(fn($v) => var_export($v, true), $schema['enum']));
+        if (is_array($enum) && !in_array($data, $enum, true)) {
+            $allowed = implode(', ', array_map(fn($v) => var_export($v, true), $enum));
             $errors[] = "Value must be one of: {$allowed}";
         }
 
-        if (isset($schema['type'])) {
-            $typeErrors = $this->validateType($data, $schema['type']);
+        if (is_string($type)) {
+            $typeErrors = $this->validateType($data, $type);
             $errors = array_merge($errors, $typeErrors);
         }
 
         if ($this->isObjectType($schema, $data)) {
+            /** @var array<string, mixed> $data */
             $errors = array_merge($errors, $this->validateObject($data, $schema, $depth));
         }
 
         if ($this->isArrayType($schema, $data)) {
+            /** @var array<int|string, mixed> $data */
             $errors = array_merge($errors, $this->validateArray($data, $schema, $depth));
         }
 
         if (isset($schema['allOf']) && is_array($schema['allOf'])) {
             foreach ($schema['allOf'] as $index => $subSchema) {
                 if (is_array($subSchema)) {
+                    /** @var array<string, mixed> $subSchema */
                     $subErrors = $this->validate($data, $subSchema, $depth + 1);
                     foreach ($subErrors as $err) {
                         $errors[] = "allOf[{$index}]: {$err}";
@@ -78,9 +83,12 @@ final class SchemaValidator
         if (isset($schema['anyOf']) && is_array($schema['anyOf'])) {
             $anyValid = false;
             foreach ($schema['anyOf'] as $subSchema) {
-                if (is_array($subSchema) && empty($this->validate($data, $subSchema, $depth + 1))) {
-                    $anyValid = true;
-                    break;
+                if (is_array($subSchema)) {
+                    /** @var array<string, mixed> $subSchema */
+                    if (empty($this->validate($data, $subSchema, $depth + 1))) {
+                        $anyValid = true;
+                        break;
+                    }
                 }
             }
             if (!$anyValid) {
@@ -91,8 +99,11 @@ final class SchemaValidator
         if (isset($schema['oneOf']) && is_array($schema['oneOf'])) {
             $matchCount = 0;
             foreach ($schema['oneOf'] as $subSchema) {
-                if (is_array($subSchema) && empty($this->validate($data, $subSchema, $depth + 1))) {
-                    $matchCount++;
+                if (is_array($subSchema)) {
+                    /** @var array<string, mixed> $subSchema */
+                    if (empty($this->validate($data, $subSchema, $depth + 1))) {
+                        $matchCount++;
+                    }
                 }
             }
             if ($matchCount !== 1) {
@@ -101,18 +112,34 @@ final class SchemaValidator
         }
 
         if (is_numeric($data)) {
-            if (isset($schema['minimum']) && $data < $schema['minimum']) {
-                $errors[] = "Value must be >= {$schema['minimum']}";
+            $minimum = $schema['minimum'] ?? null;
+            if (is_int($minimum) || is_float($minimum)) {
+                if ($data < $minimum) {
+                    $errors[] = "Value must be >= {$minimum}";
+                }
             }
-            if (isset($schema['maximum']) && $data > $schema['maximum']) {
-                $errors[] = "Value must be <= {$schema['maximum']}";
+
+            $maximum = $schema['maximum'] ?? null;
+            if (is_int($maximum) || is_float($maximum)) {
+                if ($data > $maximum) {
+                    $errors[] = "Value must be <= {$maximum}";
+                }
             }
-            if (isset($schema['exclusiveMinimum']) && $data <= $schema['exclusiveMinimum']) {
-                $errors[] = "Value must be > {$schema['exclusiveMinimum']}";
+
+            $exclusiveMinimum = $schema['exclusiveMinimum'] ?? null;
+            if (is_int($exclusiveMinimum) || is_float($exclusiveMinimum)) {
+                if ($data <= $exclusiveMinimum) {
+                    $errors[] = "Value must be > {$exclusiveMinimum}";
+                }
             }
-            if (isset($schema['exclusiveMaximum']) && $data >= $schema['exclusiveMaximum']) {
-                $errors[] = "Value must be < {$schema['exclusiveMaximum']}";
+
+            $exclusiveMaximum = $schema['exclusiveMaximum'] ?? null;
+            if (is_int($exclusiveMaximum) || is_float($exclusiveMaximum)) {
+                if ($data >= $exclusiveMaximum) {
+                    $errors[] = "Value must be < {$exclusiveMaximum}";
+                }
             }
+
             if (isset($schema['multipleOf']) && is_numeric($schema['multipleOf']) && $schema['multipleOf'] != 0) {
                 $quotient = $data / $schema['multipleOf'];
                 if (abs($quotient - round($quotient)) > 1e-9) {
@@ -122,12 +149,16 @@ final class SchemaValidator
         }
 
         if (is_string($data)) {
-            if (isset($schema['minLength']) && strlen($data) < $schema['minLength']) {
-                $errors[] = "String must be at least {$schema['minLength']} characters";
+            $minLength = $schema['minLength'] ?? null;
+            if (is_int($minLength) && strlen($data) < $minLength) {
+                $errors[] = "String must be at least {$minLength} characters";
             }
-            if (isset($schema['maxLength']) && strlen($data) > $schema['maxLength']) {
-                $errors[] = "String must be at most {$schema['maxLength']} characters";
+
+            $maxLength = $schema['maxLength'] ?? null;
+            if (is_int($maxLength) && strlen($data) > $maxLength) {
+                $errors[] = "String must be at most {$maxLength} characters";
             }
+
             if (isset($schema['pattern']) && is_string($schema['pattern'])) {
                 $pattern = $schema['pattern'];
                 $escaped = str_replace('/', '\\/', $pattern);
@@ -142,7 +173,9 @@ final class SchemaValidator
         }
 
         if (isset($schema['not']) && is_array($schema['not'])) {
-            $notErrors = $this->validate($data, $schema['not'], $depth + 1);
+            /** @var array<string, mixed> $notSchema */
+            $notSchema = $schema['not'];
+            $notErrors = $this->validate($data, $notSchema, $depth + 1);
             if (empty($notErrors)) {
                 $errors[] = 'Value must not match the "not" schema';
             }
@@ -159,17 +192,28 @@ final class SchemaValidator
     private function validateObject(array $data, array $schema, int $depth): array
     {
         $errors = [];
+        $required = $schema['required'] ?? null;
+        $properties = $schema['properties'] ?? null;
 
-        if (isset($schema['required'])) {
-            foreach ($schema['required'] as $field) {
+        if (is_array($required)) {
+            foreach ($required as $field) {
+                if (!is_string($field) || $field === '') {
+                    continue;
+                }
+
                 if (!array_key_exists($field, $data)) {
                     $errors[] = "Missing required field: {$field}";
                 }
             }
         }
 
-        if (isset($schema['properties'])) {
-            foreach ($schema['properties'] as $propName => $propSchema) {
+        if (is_array($properties)) {
+            foreach ($properties as $propName => $propSchema) {
+                if (!is_string($propName) || !is_array($propSchema)) {
+                    continue;
+                }
+
+                /** @var array<string, mixed> $propSchema */
                 if (array_key_exists($propName, $data)) {
                     $propErrors = $this->validate($data[$propName], $propSchema, $depth + 1);
                     foreach ($propErrors as $err) {
@@ -181,7 +225,9 @@ final class SchemaValidator
 
         if (array_key_exists('additionalProperties', $schema)) {
             $additional = $schema['additionalProperties'];
-            $allowed = array_keys($schema['properties'] ?? []);
+            $allowed = is_array($properties)
+                ? array_values(array_filter(array_keys($properties), static fn (mixed $key): bool => is_string($key)))
+                : [];
 
             if ($additional === false) {
                 foreach (array_keys($data) as $key) {
@@ -190,9 +236,11 @@ final class SchemaValidator
                     }
                 }
             } elseif (is_array($additional)) {
+                /** @var array<string, mixed> $additionalSchema */
+                $additionalSchema = $additional;
                 foreach (array_keys($data) as $key) {
                     if (!in_array($key, $allowed, true)) {
-                        $addErrors = $this->validate($data[$key], $additional, $depth + 1);
+                        $addErrors = $this->validate($data[$key], $additionalSchema, $depth + 1);
                         foreach ($addErrors as $err) {
                             $errors[] = "{$key}.{$err}";
                         }
@@ -201,11 +249,14 @@ final class SchemaValidator
             }
         }
 
-        if (isset($schema['minProperties']) && count($data) < $schema['minProperties']) {
-            $errors[] = "Object must have at least {$schema['minProperties']} properties";
+        $minProperties = $schema['minProperties'] ?? null;
+        if (is_int($minProperties) && count($data) < $minProperties) {
+            $errors[] = "Object must have at least {$minProperties} properties";
         }
-        if (isset($schema['maxProperties']) && count($data) > $schema['maxProperties']) {
-            $errors[] = "Object must have at most {$schema['maxProperties']} properties";
+
+        $maxProperties = $schema['maxProperties'] ?? null;
+        if (is_int($maxProperties) && count($data) > $maxProperties) {
+            $errors[] = "Object must have at most {$maxProperties} properties";
         }
 
         return $errors;
@@ -219,21 +270,27 @@ final class SchemaValidator
     private function validateArray(array $data, array $schema, int $depth): array
     {
         $errors = [];
+        $items = $schema['items'] ?? null;
 
-        if (isset($schema['items'])) {
+        if (is_array($items)) {
+            /** @var array<string, mixed> $itemSchema */
+            $itemSchema = $items;
             foreach ($data as $index => $item) {
-                $itemErrors = $this->validate($item, $schema['items'], $depth + 1);
+                $itemErrors = $this->validate($item, $itemSchema, $depth + 1);
                 foreach ($itemErrors as $err) {
                     $errors[] = "[{$index}].{$err}";
                 }
             }
         }
 
-        if (isset($schema['minItems']) && count($data) < $schema['minItems']) {
-            $errors[] = "Array must have at least {$schema['minItems']} items";
+        $minItems = $schema['minItems'] ?? null;
+        if (is_int($minItems) && count($data) < $minItems) {
+            $errors[] = "Array must have at least {$minItems} items";
         }
-        if (isset($schema['maxItems']) && count($data) > $schema['maxItems']) {
-            $errors[] = "Array must have at most {$schema['maxItems']} items";
+
+        $maxItems = $schema['maxItems'] ?? null;
+        if (is_int($maxItems) && count($data) > $maxItems) {
+            $errors[] = "Array must have at most {$maxItems} items";
         }
 
         if (($schema['uniqueItems'] ?? false) === true) {
@@ -256,13 +313,19 @@ final class SchemaValidator
      */
     private function validateType(mixed $data, string $expectedType): array
     {
+        $indexedArray = false;
+        if (is_array($data)) {
+            /** @var array<int|string, mixed> $data */
+            $indexedArray = $this->isIndexedArray($data);
+        }
+
         $valid = match ($expectedType) {
             'string' => is_string($data),
             'integer', 'int' => is_int($data),
             'number' => is_int($data) || is_float($data),
             'boolean', 'bool' => is_bool($data),
             'array' => is_array($data),
-            'object' => is_array($data) && !$this->isIndexedArray($data),
+            'object' => is_array($data) && !$indexedArray,
             'null' => $data === null,
             default => true,
         };
@@ -280,7 +343,7 @@ final class SchemaValidator
      */
     private function isObjectType(array $schema, mixed $data): bool
     {
-        return ($schema['type'] ?? null) === 'object' && is_array($data);
+        return is_string($schema['type'] ?? null) && $schema['type'] === 'object' && is_array($data);
     }
 
     /**
@@ -288,9 +351,11 @@ final class SchemaValidator
      */
     private function isArrayType(array $schema, mixed $data): bool
     {
-        if (($schema['type'] ?? null) !== 'array' || !is_array($data)) {
+        if (!is_string($schema['type'] ?? null) || $schema['type'] !== 'array' || !is_array($data)) {
             return false;
         }
+
+        /** @var array<int|string, mixed> $data */
         return $this->isIndexedArray($data);
     }
 

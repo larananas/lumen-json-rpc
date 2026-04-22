@@ -6,6 +6,7 @@ namespace Lumen\JsonRpc\Tests\Unit\Support;
 
 use Lumen\JsonRpc\Support\HookManager;
 use Lumen\JsonRpc\Support\HookPoint;
+use RuntimeException;
 use PHPUnit\Framework\TestCase;
 
 final class HookManagerTest extends TestCase
@@ -66,5 +67,43 @@ final class HookManagerTest extends TestCase
     {
         $result = $this->hooks->fire(HookPoint::ON_ERROR, ['test' => true]);
         $this->assertEquals(['test' => true], $result);
+    }
+
+    public function testFireCanIsolateHookExceptionsAndContinue(): void
+    {
+        $reported = [];
+        $called = false;
+
+        $this->hooks->register(HookPoint::BEFORE_HANDLER, static function (): array {
+            throw new RuntimeException('hook failed');
+        });
+        $this->hooks->register(HookPoint::BEFORE_HANDLER, function () use (&$called): array {
+            $called = true;
+            return ['afterFailure' => true];
+        });
+
+        $result = $this->hooks->fire(
+            HookPoint::BEFORE_HANDLER,
+            ['initial' => true],
+            function (RuntimeException $exception, HookPoint $point) use (&$reported): void {
+                $reported[] = [$point->value, $exception->getMessage()];
+            }
+        );
+
+        $this->assertTrue($called);
+        $this->assertSame([['before.handler', 'hook failed']], $reported);
+        $this->assertSame(['initial' => true, 'afterFailure' => true], $result);
+    }
+
+    public function testFirePropagatesHookExceptionsWhenNoHandlerProvided(): void
+    {
+        $this->hooks->register(HookPoint::BEFORE_HANDLER, static function (): array {
+            throw new RuntimeException('hook failed');
+        });
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('hook failed');
+
+        $this->hooks->fire(HookPoint::BEFORE_HANDLER);
     }
 }

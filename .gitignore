@@ -8,6 +8,7 @@ infection-log.txt
 coverage.xml
 coverage/
 dist.tar
+/lumen-json-rpc.zip
 
 # Lock file (library — consumers resolve their own versions)
 composer.lock

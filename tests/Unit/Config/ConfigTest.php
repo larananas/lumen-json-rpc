@@ -75,6 +75,12 @@ final class ConfigTest extends TestCase
         $this->assertArrayHasKey('content_type', $defaults);
     }
 
+    public function testAuthProtectedMethodsDefaultIsEmpty(): void
+    {
+        $defaults = Defaults::all();
+        $this->assertSame([], $defaults['auth']['protected_methods']);
+    }
+
     public function testFromFileThrowsOnMissingFile(): void
     {
         $this->expectException(\RuntimeException::class);
@@ -110,7 +116,7 @@ final class ConfigTest extends TestCase
     public function testDefaultsIncludeFailOpen(): void
     {
         $defaults = Defaults::all();
-        $this->assertTrue($defaults['rate_limit']['fail_open']);
+        $this->assertFalse($defaults['rate_limit']['fail_open']);
     }
 
     public function testDefaultsIncludeContentTypeStrict(): void

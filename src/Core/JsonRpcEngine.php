@@ -4,11 +4,7 @@ declare(strict_types=1);
 
 namespace Lumen\JsonRpc\Core;
 
-use Lumen\JsonRpc\Auth\ApiKeyAuthenticator;
 use Lumen\JsonRpc\Auth\AuthManager;
-use Lumen\JsonRpc\Auth\BasicAuthenticator;
-use Lumen\JsonRpc\Auth\JwtAuthenticator;
-use Lumen\JsonRpc\Auth\JwtRequestAuthenticator;
 use Lumen\JsonRpc\Auth\RequestAuthenticatorInterface;
 use Lumen\JsonRpc\Cache\ResponseFingerprinter;
 use Lumen\JsonRpc\Config\Config;
@@ -27,6 +23,7 @@ use Lumen\JsonRpc\Support\HookManager;
 use Lumen\JsonRpc\Support\HookPoint;
 use Lumen\JsonRpc\Support\RequestContext;
 use Lumen\JsonRpc\Validation\SchemaValidator;
+use Throwable;
 
 final class JsonRpcEngine
 {
@@ -66,6 +63,7 @@ final class JsonRpcEngine
         BatchProcessor $batchProcessor,
         HandlerDispatcher $dispatcher,
         HandlerRegistry $registry,
+        ?RequestAuthenticatorInterface $requestAuthenticator = null,
     ) {
         $this->config = $config;
         $this->logger = $logger;
@@ -76,6 +74,7 @@ final class JsonRpcEngine
         $this->batchProcessor = $batchProcessor;
         $this->dispatcher = $dispatcher;
         $this->registry = $registry;
+        $this->requestAuthenticator = $requestAuthenticator;
         $this->middlewarePipeline = new MiddlewarePipeline();
 
         if ($this->config->get('validation.schema.enabled', false)) {
@@ -389,6 +388,11 @@ final class JsonRpcEngine
         }
 
         $schema = $schemas[$methodName];
+        if (!is_array($schema)) {
+            return null;
+        }
+        /** @var array<string, mixed> $schema */
+
         $params = $request->params ?? [];
 
         $errors = $this->schemaValidator?->validate($params, $schema) ?? [];
@@ -412,10 +416,6 @@ final class JsonRpcEngine
             return $context;
         }
 
-        if ($this->requestAuthenticator === null) {
-            $this->initializeAuthDriver();
-        }
-
         if ($this->requestAuthenticator !== null) {
             $userContext = $this->requestAuthenticator->authenticateFromHeaders($headers);
             if ($userContext !== null) {
@@ -432,37 +432,6 @@ final class JsonRpcEngine
         $this->fireHook(HookPoint::ON_AUTH_FAILURE, []);
         $this->logger->warning('Auth failed', [], $context->correlationId);
         return $context;
-    }
-
-    private function initializeAuthDriver(): void
-    {
-        $driver = $this->config->get('auth.driver', 'jwt');
-        $allowedDrivers = ['jwt', 'api_key', 'basic'];
-        if (!in_array($driver, $allowedDrivers, true)) {
-            return;
-        }
-
-        $this->requestAuthenticator = match ($driver) {
-            'jwt' => new JwtRequestAuthenticator(
-                new JwtAuthenticator(
-                    secret: $this->config->get('auth.jwt.secret', ''),
-                    algorithm: $this->config->get('auth.jwt.algorithm', 'HS256'),
-                    issuer: $this->config->get('auth.jwt.issuer', ''),
-                    audience: $this->config->get('auth.jwt.audience', ''),
-                    leeway: $this->config->get('auth.jwt.leeway', 0),
-                ),
-                header: $this->config->get('auth.jwt.header', 'Authorization'),
-                prefix: $this->config->get('auth.jwt.prefix', 'Bearer '),
-            ),
-            'api_key' => new ApiKeyAuthenticator(
-                header: $this->config->get('auth.api_key.header', 'X-API-Key'),
-                keys: $this->config->get('auth.api_key.keys', []),
-            ),
-            'basic' => new BasicAuthenticator(
-                header: $this->config->get('auth.basic.header', 'Authorization'),
-                users: $this->config->get('auth.basic.users', []),
-            ),
-        };
     }
 
     public function addMiddleware(MiddlewareInterface $middleware): self
@@ -519,19 +488,33 @@ final class JsonRpcEngine
 
     private function isMethodProtected(string $method): bool
     {
-        $protectedPrefixes = $this->config->get('auth.protected_methods', []);
-        if ($protectedPrefixes === []) {
+        $protectedMethods = $this->config->get('auth.protected_methods', []);
+        if (!is_array($protectedMethods) || $protectedMethods === []) {
             return false;
         }
 
         $sep = $this->config->get('handlers.method_separator', '.');
+        if (!is_string($sep) || $sep === '') {
+            $sep = '.';
+        }
 
-        foreach ($protectedPrefixes as $prefix) {
-            $normalizedPrefix = $prefix;
-            if (str_ends_with($prefix, '.')) {
-                $normalizedPrefix = rtrim($prefix, '.') . $sep;
+        foreach ($protectedMethods as $candidate) {
+            if (!is_string($candidate) || $candidate === '') {
+                continue;
             }
-            if (str_starts_with($method, $normalizedPrefix)) {
+
+            if ($candidate === $method) {
+                return true;
+            }
+
+            $normalizedPrefix = null;
+            if (str_ends_with($candidate, '.')) {
+                $normalizedPrefix = rtrim($candidate, '.') . $sep;
+            } elseif (str_ends_with($candidate, $sep)) {
+                $normalizedPrefix = $candidate;
+            }
+
+            if ($normalizedPrefix !== null && str_starts_with($method, $normalizedPrefix)) {
                 return true;
             }
         }
@@ -545,8 +528,26 @@ final class JsonRpcEngine
      */
     private function fireHook(HookPoint $point, array $context = []): array
     {
-        if ($this->config->get('hooks.enabled', true)) {
-            return $this->hooks->fire($point, $context);
+        $hooksEnabled = $this->config->get('hooks.enabled', true);
+        if (is_bool($hooksEnabled) && $hooksEnabled) {
+            $isolateExceptions = $this->config->get('hooks.isolate_exceptions', true);
+            if (!is_bool($isolateExceptions) || !$isolateExceptions) {
+                return $this->hooks->fire($point, $context);
+            }
+
+            $correlationId = is_string($context['correlationId'] ?? null) ? $context['correlationId'] : null;
+
+            return $this->hooks->fire(
+                $point,
+                $context,
+                function (Throwable $exception, HookPoint $failedPoint) use ($correlationId): void {
+                    $this->logger->warning('Hook callback failed; continuing request', [
+                        'hook' => $failedPoint->value,
+                        'exception' => $exception::class,
+                        'message' => $exception->getMessage(),
+                    ], $correlationId);
+                }
+            );
         }
         return $context;
     }
@@ -558,6 +559,10 @@ final class JsonRpcEngine
         }
 
         $maxDepth = $this->config->get('limits.max_json_depth', 64);
+        if (!is_int($maxDepth) || $maxDepth < 1) {
+            $maxDepth = 64;
+        }
+
         $decoded = json_decode($body, true, $maxDepth, JSON_BIGINT_AS_STRING);
 
         if (json_last_error() !== JSON_ERROR_NONE) {

@@ -9,7 +9,7 @@ final class RequestValidator
     private const MAX_METHOD_LENGTH = 256;
 
     public function __construct(
-        private readonly bool $strict = true,
+        private readonly bool $strict = false,
     ) {}
 
     /**

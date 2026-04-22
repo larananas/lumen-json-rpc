@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Lumen\JsonRpc\Support;
 
+use Throwable;
+
 enum HookPoint: string
 {
     case BEFORE_REQUEST = 'before.request';
@@ -32,13 +34,24 @@ final class HookManager
 
     /**
      * @param array<string, mixed> $context
+     * @param null|callable(Throwable, HookPoint, array<string, mixed>): void $onException
      * @return array<string, mixed>
      */
-    public function fire(HookPoint $point, array $context = []): array
+    public function fire(HookPoint $point, array $context = [], ?callable $onException = null): array
     {
         $hooks = $this->hooks[$point->value] ?? [];
         foreach ($hooks as $hook) {
-            $result = ($hook['callback'])($context);
+            try {
+                $result = ($hook['callback'])($context);
+            } catch (Throwable $exception) {
+                if ($onException === null) {
+                    throw $exception;
+                }
+
+                $onException($exception, $point, $context);
+                continue;
+            }
+
             if (is_array($result)) {
                 $context = array_merge($context, $result);
             }

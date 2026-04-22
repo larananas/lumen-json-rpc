@@ -30,12 +30,12 @@ jobs:
           key: composer-${{ runner.os }}-${{ hashFiles('composer.json') }}
           restore-keys: composer-${{ runner.os }}-
 
-      - run: composer validate --strict
+      - run: composer validate --strict --no-check-version
       - run: composer install --prefer-dist --no-interaction --no-progress
-      - run: composer audit --locked --abandoned=report
+      - run: composer audit --abandoned=report
       - run: php bin/verify-package.php
       - run: php bin/lint-syntax.php
-      - run: vendor/bin/phpstan analyse --no-progress
+      - run: vendor/bin/phpstan analyse --memory-limit=512M --no-progress
 
   tests:
     runs-on: ubuntu-latest
@@ -107,6 +107,5 @@ jobs:
           restore-keys: composer-${{ runner.os }}-8.3-
 
       - run: composer install --prefer-dist --no-interaction --no-progress
-      - name: Run Infection (advisory)
+      - name: Run Infection
         run: vendor/bin/infection --threads=max --min-msi=80 --min-covered-msi=85 --no-progress
-        continue-on-error: true

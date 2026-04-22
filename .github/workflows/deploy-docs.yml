@@ -28,6 +28,8 @@ jobs:
       - run: composer install --prefer-dist --no-interaction --no-progress --no-dev
 
       - run: php bin/build-docs-site.php
+        env:
+          DOCS_CNAME: ${{ secrets.DOCS_CNAME }}
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

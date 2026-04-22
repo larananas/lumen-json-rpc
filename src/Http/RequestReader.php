@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Lumen\JsonRpc\Http;
 
+use Lumen\JsonRpc\Support\Compressor;
+
 final class RequestReader
 {
     public function __construct(
@@ -20,11 +22,8 @@ final class RequestReader
         }
 
         if ($this->requestGzipEnabled && $request->isGzipped()) {
-            if (!function_exists('gzdecode')) {
-                return '';
-            }
-            $decoded = @gzdecode($body);
-            if ($decoded === false) {
+            $decoded = Compressor::decodeGzip($body);
+            if ($decoded === null) {
                 return '';
             }
             if (strlen($decoded) > $this->maxBodySize) {

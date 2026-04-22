@@ -16,14 +16,14 @@ final class Defaults
     {
         return [
             'handlers' => [
-                'paths' => [__DIR__ . '/../../handlers'],
+                'paths' => [],
                 'namespace' => 'App\\Handlers\\',
                 'method_separator' => '.',
             ],
             'auth' => [
                 'enabled' => false,
                 'driver' => 'jwt',
-                'protected_methods' => ['user.', 'order.'],
+                'protected_methods' => [],
                 'jwt' => [
                     'secret' => '',
                     'algorithm' => 'HS256',
@@ -52,8 +52,7 @@ final class Defaults
             'logging' => [
                 'enabled' => true,
                 'level' => 'info',
-                'path' => __DIR__ . '/../../logs/app.log',
-                'format' => 'text',
+                'path' => 'logs/app.log',
                 'sanitize_secrets' => true,
             ],
             'log_rotation' => [
@@ -71,9 +70,9 @@ final class Defaults
                 'max_requests' => 100,
                 'window_seconds' => 60,
                 'strategy' => 'ip',
-                'storage_path' => __DIR__ . '/../../storage/rate_limit',
+                'storage_path' => 'storage/rate_limit',
                 'batch_weight' => 1,
-                'fail_open' => true,
+                'fail_open' => false,
             ],
             'debug' => false,
             'notifications' => [
@@ -89,7 +88,7 @@ final class Defaults
                 'enabled' => true,
             ],
             'validation' => [
-                'strict' => true,
+                'strict' => false,
                 'schema' => [
                     'enabled' => false,
                 ],
@@ -99,10 +98,12 @@ final class Defaults
             ],
             'hooks' => [
                 'enabled' => true,
+                'isolate_exceptions' => true,
             ],
             'server' => [
                 'version' => '1.0.0',
                 'name' => 'Lumen JSON-RPC',
+                'url' => '',
             ],
         ];
     }

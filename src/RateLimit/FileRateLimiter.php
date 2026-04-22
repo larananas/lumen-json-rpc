@@ -10,7 +10,7 @@ final class FileRateLimiter implements RateLimiterInterface
         private readonly int $maxRequests = 100,
         private readonly int $windowSeconds = 60,
         private readonly string $storagePath = '',
-        private readonly bool $failOpen = true,
+        private readonly bool $failOpen = false,
     ) {}
 
     public function check(string $key): RateLimitResult

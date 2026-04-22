@@ -35,8 +35,6 @@ final class CoreDirectAutoAuthTest extends TestCase
                 'jwt' => ['secret' => 'test-secret'],
             ],
         ]);
-        $engine = $server->getEngine();
-
         $token = $this->createJwtToken([
             'sub' => 'user-1',
             'exp' => time() + 3600,
@@ -49,9 +47,9 @@ final class CoreDirectAutoAuthTest extends TestCase
         );
 
         $json = json_encode(['jsonrpc' => '2.0', 'method' => 'system.health', 'id' => 1]);
-        $result = $engine->handleJson($json, $context);
+        $result = $server->handleJson($json, $context);
 
-        $data = json_decode($result->json, true);
+        $data = json_decode($result, true);
         $this->assertEquals('ok', $data['result']['status']);
     }
 
@@ -70,8 +68,6 @@ final class CoreDirectAutoAuthTest extends TestCase
                 ],
             ],
         ]);
-        $engine = $server->getEngine();
-
         $context = new RequestContext(
             correlationId: 'auto-apikey-test',
             headers: ['X-API-Key' => 'test-key-123'],
@@ -79,9 +75,9 @@ final class CoreDirectAutoAuthTest extends TestCase
         );
 
         $json = json_encode(['jsonrpc' => '2.0', 'method' => 'system.health', 'id' => 1]);
-        $result = $engine->handleJson($json, $context);
+        $result = $server->handleJson($json, $context);
 
-        $data = json_decode($result->json, true);
+        $data = json_decode($result, true);
         $this->assertEquals('ok', $data['result']['status']);
     }
 
@@ -99,8 +95,6 @@ final class CoreDirectAutoAuthTest extends TestCase
                 ],
             ],
         ]);
-        $engine = $server->getEngine();
-
         $encoded = base64_encode('admin:secret');
         $context = new RequestContext(
             correlationId: 'auto-basic-test',
@@ -109,9 +103,9 @@ final class CoreDirectAutoAuthTest extends TestCase
         );
 
         $json = json_encode(['jsonrpc' => '2.0', 'method' => 'system.health', 'id' => 1]);
-        $result = $engine->handleJson($json, $context);
+        $result = $server->handleJson($json, $context);
 
-        $data = json_decode($result->json, true);
+        $data = json_decode($result, true);
         $this->assertEquals('ok', $data['result']['status']);
     }
 
@@ -125,8 +119,6 @@ final class CoreDirectAutoAuthTest extends TestCase
                 'jwt' => ['secret' => 'test-secret'],
             ],
         ]);
-        $engine = $server->getEngine();
-
         $context = new RequestContext(
             correlationId: 'auto-no-headers',
             headers: [],
@@ -134,9 +126,9 @@ final class CoreDirectAutoAuthTest extends TestCase
         );
 
         $json = json_encode(['jsonrpc' => '2.0', 'method' => 'system.health', 'id' => 1]);
-        $result = $engine->handleJson($json, $context);
+        $result = $server->handleJson($json, $context);
 
-        $data = json_decode($result->json, true);
+        $data = json_decode($result, true);
         $this->assertEquals(-32001, $data['error']['code']);
         $this->assertEquals('Authentication required', $data['error']['message']);
     }
@@ -151,8 +143,6 @@ final class CoreDirectAutoAuthTest extends TestCase
                 'jwt' => ['secret' => 'test-secret'],
             ],
         ]);
-        $engine = $server->getEngine();
-
         $context = new RequestContext(
             correlationId: 'auto-invalid-headers',
             headers: ['Authorization' => 'Bearer invalid.token.here'],
@@ -160,9 +150,9 @@ final class CoreDirectAutoAuthTest extends TestCase
         );
 
         $json = json_encode(['jsonrpc' => '2.0', 'method' => 'system.health', 'id' => 1]);
-        $result = $engine->handleJson($json, $context);
+        $result = $server->handleJson($json, $context);
 
-        $data = json_decode($result->json, true);
+        $data = json_decode($result, true);
         $this->assertEquals(-32001, $data['error']['code']);
         $this->assertEquals('Authentication required', $data['error']['message']);
     }
@@ -177,8 +167,6 @@ final class CoreDirectAutoAuthTest extends TestCase
                 'jwt' => ['secret' => 'test-secret'],
             ],
         ]);
-        $engine = $server->getEngine();
-
         $context = new RequestContext(
             correlationId: 'auto-preserve-auth',
             headers: ['Authorization' => 'Bearer some.different.token'],
@@ -189,9 +177,9 @@ final class CoreDirectAutoAuthTest extends TestCase
         );
 
         $json = json_encode(['jsonrpc' => '2.0', 'method' => 'system.health', 'id' => 1]);
-        $result = $engine->handleJson($json, $context);
+        $result = $server->handleJson($json, $context);
 
-        $data = json_decode($result->json, true);
+        $data = json_decode($result, true);
         $this->assertEquals('ok', $data['result']['status']);
     }
 }

@@ -32,6 +32,7 @@ final class BatchProcessor
         }
 
         if ($rawIsObject || $this->isAssociative($decoded)) {
+            /** @var array<string, mixed> $decoded */
             $validationError = $this->validator->validateArray($decoded);
             if ($validationError !== null) {
                 $id = array_key_exists('id', $decoded) ? Request::sanitizeId($decoded['id']) : null;
@@ -65,6 +66,7 @@ final class BatchProcessor
                 continue;
             }
 
+            /** @var array<string, mixed> $item */
             $validationError = $this->validator->validateArray($item);
             if ($validationError !== null) {
                 $id = array_key_exists('id', $item) ? Request::sanitizeId($item['id']) : null;

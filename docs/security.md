@@ -52,12 +52,12 @@ When compression is enabled, backup files only receive the `.gz` extension when 
 - Window-based counting resets naturally at time boundaries
 - Weighted consumption is atomic: a batch request either consumes all its quota hits or none
 - Oversized batches count against rate limits based on the actual number of items received, not the post-validation count
-- Configurable `fail_open` behavior: by default, requests are allowed on storage failure with a warning; set `fail_open: false` to deny on failure (fail-closed)
+- Configurable `fail_open` behavior: by default, requests are denied on storage failure with a warning (fail-closed); set `fail_open: true` only if you intentionally want storage failures to allow requests
 - Storage lock failures and file access errors trigger `E_USER_WARNING` for monitoring
 
 ## Compression
 
-- Gzip decompression failures return safe parse errors
+- Gzip decompression failures return `-32600 Invalid Request`, not `-32700 Parse error`
 - Compressed payloads still count toward the body size limit
 - The raw body is checked before decompression
 
@@ -112,7 +112,7 @@ In production mode (`debug: false`):
         'enabled' => true,
         'max_requests' => 100,
         'window_seconds' => 60,
-        'fail_open' => false,        // Fail-closed in production
+        'fail_open' => false,        // Default and recommended: fail-closed
     ],
     'auth' => [
         'enabled' => true,

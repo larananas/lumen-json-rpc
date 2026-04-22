@@ -7,7 +7,7 @@ namespace Lumen\JsonRpc\Auth;
 final class BasicAuthenticator implements RequestAuthenticatorInterface
 {
     /**
-     * @param array<string, array{password: string, user_id?: string, claims?: array<string, mixed>, roles?: array<int, string>}> $users
+     * @param array<string, array{password?: string, password_hash?: string, user_id?: string, claims?: array<string, mixed>, roles?: array<int, string>}> $users
      */
     public function __construct(
         private readonly string $header = 'Authorization',
@@ -52,7 +52,7 @@ final class BasicAuthenticator implements RequestAuthenticatorInterface
 
         $userConfig = $this->users[$username];
 
-        if (!hash_equals($userConfig['password'], $password)) {
+        if (!$this->isPasswordValid($userConfig, $password)) {
             return null;
         }
 
@@ -61,6 +61,24 @@ final class BasicAuthenticator implements RequestAuthenticatorInterface
             claims: $userConfig['claims'] ?? [],
             roles: $userConfig['roles'] ?? [],
         );
+    }
+
+    /**
+     * @param array{password?: string, password_hash?: string, user_id?: string, claims?: array<string, mixed>, roles?: array<int, string>} $userConfig
+     */
+    private function isPasswordValid(array $userConfig, string $password): bool
+    {
+        $passwordHash = $userConfig['password_hash'] ?? null;
+        if (is_string($passwordHash) && $passwordHash !== '') {
+            return password_verify($password, $passwordHash);
+        }
+
+        $configuredPassword = $userConfig['password'] ?? null;
+        if (!is_string($configuredPassword) || $configuredPassword === '') {
+            return false;
+        }
+
+        return hash_equals($configuredPassword, $password);
     }
 
     /**

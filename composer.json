@@ -1,6 +1,6 @@
 {
   "name": "larananas/lumen-json-rpc",
-  "description": "Illuminate your PHP backend with JSON-RPC 2.0 clarity.",
+  "description": "Framework-free JSON-RPC 2.0 server library for modern PHP.",
   "type": "library",
   "license": "LGPL-3.0-or-later",
   "keywords": [
@@ -41,9 +41,16 @@
   ],
   "scripts": {
     "test": "@php vendor/bin/phpunit",
-    "test:coverage": "@php vendor/bin/phpunit --coverage-text --coverage-clover=coverage.xml",
+    "check:coverage-driver": "@php bin/check-coverage-driver.php",
+    "test:coverage": [
+      "@check:coverage-driver",
+      "@php vendor/bin/phpunit --coverage-text --coverage-clover=coverage.xml"
+    ],
     "stan": "@php vendor/bin/phpstan analyse --memory-limit=512M",
-    "mutate": "@php vendor/bin/infection --threads=max --min-msi=80 --min-covered-msi=85",
+    "mutate": [
+      "@check:coverage-driver",
+      "@php vendor/bin/infection --threads=max --min-msi=80 --min-covered-msi=85"
+    ],
     "lint": "@php bin/lint-syntax.php",
     "verify:package": "@php bin/verify-package.php",
     "check:coverage": "@php bin/check-coverage.php",
@@ -52,23 +59,22 @@
       "@verify:package",
       "@package:build"
     ],
-    "docs:build": "@php bin/build-docs-site.php",
     "docs:clean": "@php -r \"array_map('unlink', glob('docs-site/**/*', GLOB_BRACE)); array_map('rmdir', glob('docs-site/*', GLOB_ONLYDIR));\"",
     "check": [
       "@stan",
       "@test"
     ],
     "qa": [
-      "@php composer validate --strict",
-      "@php composer audit --locked",
+      "@php composer validate --strict --no-check-version",
+      "@php composer audit --abandoned=report",
       "@verify:package",
       "@lint",
       "@stan",
       "@test"
     ],
     "qa:max": [
-      "@php composer validate --strict",
-      "@php composer audit --locked",
+      "@php composer validate --strict --no-check-version",
+      "@php composer audit --abandoned=report",
       "@verify:package",
       "@lint",
       "@stan",

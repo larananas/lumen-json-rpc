@@ -30,16 +30,19 @@ final class Request
         if (!is_array($params)) {
             $params = null;
         }
+        /** @var array<int|string, mixed>|null $params */
 
         $idProvided = array_key_exists('id', $data);
         $id = $idProvided ? self::sanitizeId($data['id']) : null;
+        $method = $data['method'] ?? '';
+        $jsonrpc = $data['jsonrpc'] ?? '';
 
         return new self(
-            method: (string)($data['method'] ?? ''),
+            method: is_string($method) ? $method : '',
             id: $id,
             params: $params,
             idProvided: $idProvided,
-            jsonrpc: (string)($data['jsonrpc'] ?? ''),
+            jsonrpc: is_string($jsonrpc) ? $jsonrpc : '',
         );
     }
 

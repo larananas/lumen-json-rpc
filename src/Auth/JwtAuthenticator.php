@@ -49,15 +49,27 @@ final class JwtAuthenticator implements AuthenticatorInterface
             return null;
         }
 
-        $userId = (string)($payload['sub'] ?? $payload['user_id'] ?? '');
+        $userIdValue = $payload['sub'] ?? $payload['user_id'] ?? '';
+        if (!is_string($userIdValue) && !is_int($userIdValue)) {
+            return null;
+        }
+
+        $userId = (string) $userIdValue;
         if ($userId === '') {
             return null;
         }
 
+        $roles = $payload['roles'] ?? [];
+        if (!is_array($roles)) {
+            $roles = [];
+        }
+
+        $roles = array_values(array_filter($roles, static fn (mixed $role): bool => is_string($role)));
+
         return new UserContext(
             userId: $userId,
             claims: $payload,
-            roles: (array)($payload['roles'] ?? []),
+            roles: $roles,
         );
     }
 
@@ -115,6 +127,8 @@ final class JwtAuthenticator implements AuthenticatorInterface
         if (!is_array($header) || !is_array($payload)) {
             return null;
         }
+
+        /** @var array<string, mixed> $payload */
 
         if (($header['typ'] ?? '') !== 'JWT') {
             return null;

@@ -112,12 +112,10 @@ final class RequestValidatorTest extends TestCase
         $this->assertNull($this->validator->validateArray($data));
     }
 
-    public function testExtraMembersRejected(): void
+    public function testExtraMembersAllowedByDefault(): void
     {
         $data = ['jsonrpc' => '2.0', 'method' => 'test', 'id' => 1, 'extra' => 'value'];
-        $error = $this->validator->validateArray($data);
-        $this->assertNotNull($error);
-        $this->assertEquals(-32600, $error->code);
+        $this->assertNull($this->validator->validateArray($data));
     }
 
     public function testEmptyMethodRejected(): void
@@ -181,5 +179,14 @@ final class RequestValidatorTest extends TestCase
         $validator = new RequestValidator(strict: false);
         $data = ['jsonrpc' => '2.0', 'method' => 'test', 'id' => 1, 'extra' => 'value'];
         $this->assertNull($validator->validateArray($data));
+    }
+
+    public function testStrictModeRejectsExtraMembers(): void
+    {
+        $validator = new RequestValidator(strict: true);
+        $data = ['jsonrpc' => '2.0', 'method' => 'test', 'id' => 1, 'extra' => 'value'];
+        $error = $validator->validateArray($data);
+        $this->assertNotNull($error);
+        $this->assertEquals(-32600, $error->code);
     }
 }

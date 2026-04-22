@@ -2,14 +2,13 @@
 
 declare(strict_types=1);
 
-if (php_sapi_name() !== 'cli') {
+if (!in_array(PHP_SAPI, ['cli', 'phpdbg'], true)) {
     fwrite(STDERR, "This script must be run from the command line.\n");
     exit(1);
 }
 
 $root = dirname(__DIR__);
 $outputDir = $root . DIRECTORY_SEPARATOR . 'docs-site';
-$srcDir = $root . DIRECTORY_SEPARATOR . 'docs-site-src';
 $docsDir = $root . DIRECTORY_SEPARATOR . 'docs';
 
 if (is_dir($outputDir)) {
@@ -18,10 +17,19 @@ if (is_dir($outputDir)) {
         RecursiveIteratorIterator::CHILD_FIRST,
     );
     foreach ($it as $file) {
+        if (!$file instanceof SplFileInfo) {
+            continue;
+        }
+
+        $path = $file->getRealPath();
+        if ($path === false) {
+            continue;
+        }
+
         if ($file->isDir()) {
-            rmdir($file->getRealPath());
+            rmdir($path);
         } else {
-            unlink($file->getRealPath());
+            unlink($path);
         }
     }
     rmdir($outputDir);
@@ -223,7 +231,7 @@ function renderHomePage(array $config): string
 <div class="feature"><h3>Rate limiting</h3><p>Pluggable backends, file-based default, atomic batch weight.</p></div>
 <div class="feature"><h3>Docs generation</h3><p>Markdown, HTML, JSON, OpenRPC from handler metadata.</p></div>
 <div class="feature"><h3>Middleware pipeline</h3><p>Wrap request execution with before/after logic.</p></div>
-<div class="feature"><h3>Production ready</h3><p>Strict validation, safe defaults, comprehensive tests.</p></div>
+<div class="feature"><h3>Operational defaults</h3><p>Strict validation, safe defaults, and tested QA/release tooling.</p></div>
 </div>
 HTML;
 }
@@ -234,11 +242,12 @@ function renderInstallationPage(): string
 <h1>Installation</h1>
 <h2>Requirements</h2>
 <ul>
-<li><strong>PHP 8.1+</strong></li>
+<li><strong>PHP &gt;=8.2</strong></li>
 <li><strong>ext-json</strong></li>
 </ul>
 <h2>Install via Composer</h2>
 <pre><code>composer require larananas/lumen-json-rpc</code></pre>
+<p>Composer consumers install the normal tagged package archive. Repository-only assets such as tests, examples, source docs, CI workflows, and the docs-site builder are intentionally excluded from the package.</p>
 <h2>Optional extras</h2>
 <table>
 <tr><th>Extra</th><th>Purpose</th></tr>
@@ -549,10 +558,11 @@ function renderDocsGenerationPage(): string
     return <<<'HTML'
 <h1>Documentation Generation</h1>
 <h2>Generate docs from handlers</h2>
-<pre><code>php bin/generate-docs.php --format=markdown --output=docs/api.md
-php bin/generate-docs.php --format=html --output=docs/api.html
-php bin/generate-docs.php --format=json --output=docs/api.json
-php bin/generate-docs.php --format=openrpc --output=docs/openrpc.json</code></pre>
+<pre><code>php bin/generate-docs.php --config=./config.php --format=markdown --output=docs/api.md
+php bin/generate-docs.php --config=./config.php --format=html --output=docs/api.html
+php bin/generate-docs.php --config=./config.php --format=json --output=docs/api.json
+php bin/generate-docs.php --config=./config.php --format=openrpc --output=docs/openrpc.json</code></pre>
+<p>The docs generator is included in Composer package archives. Repository docs, examples, and the docs-site builder remain repository-only maintenance assets.</p>
 
 <h2>Supported formats</h2>
 <table>
@@ -569,6 +579,9 @@ php bin/generate-docs.php --format=openrpc --output=docs/openrpc.json</code></pr
 <li>Handler method reflection (types, defaults, required)</li>
 <li>PHPDoc tags (<code>@param</code>, <code>@return</code>, <code>@throws</code>, <code>@error</code>)</li>
 <li>Procedure descriptor metadata</li>
+<li>Runtime request schemas from <code>RpcSchemaProviderInterface</code> when available</li>
+<li>Explicit descriptor <code>resultSchema</code> metadata for richer JSON/OpenRPC result contracts</li>
+<li>Auto-discovered handler docblock <code>@result-schema</code> tags for richer JSON/OpenRPC result contracts</li>
 <li><code>@requiresAuth</code> / <code>@authenticated</code> annotations</li>
 <li><code>@example-request</code> / <code>@example-response</code> annotations</li>
 </ul>
@@ -580,19 +593,19 @@ function renderOpenRpcPage(): string
     return <<<'HTML'
 <h1>OpenRPC Support</h1>
 <h2>Generating OpenRPC specs</h2>
-<pre><code>php bin/generate-docs.php --format=openrpc --output=docs/openrpc.json</code></pre>
+<pre><code>php bin/generate-docs.php --config=./config.php --format=openrpc --output=docs/openrpc.json</code></pre>
 <p>Produces an <a href="https://spec.open-rpc.org/">OpenRPC 1.3.2</a> compliant specification from your handlers.</p>
 
 <h2>Validation approach</h2>
 <p>The OpenRPC output is validated using:</p>
 <ul>
-<li><strong>Structural validation</strong>: PHP tests verify required fields, correct types, and valid structure against the OpenRPC 1.3.2 schema definitions</li>
+<li><strong>Formal schema validation</strong>: PHP tests validate generated output with a JSON Schema validator against the OpenRPC 1.3.2 fixture</li>
 <li><strong>Pinned schema fixture</strong>: The official OpenRPC 1.3.2 JSON Schema is bundled in <code>tests/Fixtures/openrpc-schema-1.3.2.json</code></li>
 <li><strong>Property coverage tests</strong>: Verify required fields on method objects, content descriptors, error objects, and tag objects</li>
 </ul>
 
 <h2>Honest scope</h2>
-<p>The validation is <strong>structural, not formal</strong>. It checks:</p>
+<p>The generator is validated against the bundled OpenRPC schema fixture in tests. It uses PHP-derived type information, descriptor metadata, and runtime request schemas from <code>RpcSchemaProviderInterface</code> when available, but it still does not attempt a full JSON Schema to OpenRPC translation layer.</p>
 <ul>
 <li>Top-level required fields (<code>openrpc</code>, <code>info</code>, <code>methods</code>)</li>
 <li>Info block structure</li>
@@ -600,9 +613,10 @@ function renderOpenRpcPage(): string
 <li>Method object required fields (<code>name</code>, <code>params</code>, <code>result</code>)</li>
 <li>Content descriptor required fields (<code>name</code>, <code>schema</code>)</li>
 <li>Error object required fields (<code>code</code>, <code>message</code>)</li>
+<li>Schema-backed parameter constraints and the <code>x-jsonrpc-requestSchema</code> extension when runtime schemas are present</li>
 <li>Extension fields (<code>x-requiresAuth</code>)</li>
 </ul>
-<p>It does <strong>not</strong> validate against the full JSON Schema meta-schema using a machine validator. Full formal validation against the official JSON Schema would require a complete JSON Schema validator library, which this project intentionally avoids as a runtime dependency.</p>
+<p>The JSON Schema validator is a development dependency used in tests only. It is not required at runtime.</p>
 
 <h2>PHP type to JSON Schema mapping</h2>
 <table>
@@ -625,27 +639,28 @@ function renderExamplesPage(): string
 {
     return <<<'HTML'
 <h1>Examples</h1>
+<p>Repository examples are published with the source repository, not the Composer package archive.</p>
 <h2>Basic example</h2>
-<p>A minimal server with handlers and no auth. See <code>examples/basic/</code>.</p>
+<p>A minimal server with handlers and no auth. <a href="https://github.com/larananas/lumen-json-rpc/tree/main/examples/basic">View the basic example</a>.</p>
 
 <h2>Auth example</h2>
-<p>JWT auth with a working example app. See <code>examples/auth/</code>.</p>
+<p>JWT auth with a working example app. <a href="https://github.com/larananas/lumen-json-rpc/tree/main/examples/auth">View the auth example</a>.</p>
 
 <h2>Advanced example</h2>
-<p>Custom handler factory, middleware, schema validation. See <code>examples/advanced/</code>.</p>
+<p>Custom handler factory, middleware, schema validation. <a href="https://github.com/larananas/lumen-json-rpc/tree/main/examples/advanced">View the advanced example</a>.</p>
 
 <h2>Browser demo</h2>
-<p>A tiny HTML page for sending raw JSON-RPC requests. See <code>examples/browser-demo/</code>.</p>
+<p>A tiny HTML page for sending raw JSON-RPC requests. <a href="https://github.com/larananas/lumen-json-rpc/tree/main/examples/browser-demo">View the browser demo</a>.</p>
 
 <h2>Usage patterns</h2>
-<h3>Direct core usage (no HTTP)</h3>
+<h3>Direct JSON usage (no HTTP)</h3>
 <pre><code>$json = $server->handleJson(
     '{"jsonrpc":"2.0","method":"system.health","id":1}',
     $context,
 );</code></pre>
 
 <h3>Custom rate limiter backend</h3>
-<pre><code>$server->getEngine()->getRateLimitManager()->setLimiter(new MyRedisRateLimiter());</code></pre>
+<pre><code>$server->setRateLimiter(new MyRedisRateLimiter());</code></pre>
 
 <h3>Response fingerprinting</h3>
 <pre><code>'response_fingerprint' => ['enabled' => true, 'algorithm' => 'sha256'],</code></pre>
@@ -660,27 +675,29 @@ function renderQualityPage(): string
 <table>
 <tr><th>Command</th><th>Purpose</th></tr>
 <tr><td><code>composer qa</code></td><td>Standard quality gate: validate, audit, package verify, lint, stan, test</td></tr>
-<tr><td><code>composer qa:max</code></td><td>Maximum quality bar: all of qa + coverage + mutation testing</td></tr>
+<tr><td><code>composer qa:max</code></td><td>Extended local bar: qa + coverage threshold check + mutation testing (requires a local coverage driver)</td></tr>
 <tr><td><code>composer test</code></td><td>Run PHPUnit tests</td></tr>
-<tr><td><code>composer test:coverage</code></td><td>Run tests with coverage report</td></tr>
+<tr><td><code>composer test:coverage</code></td><td>Run tests with coverage report (Xdebug coverage mode or PCOV)</td></tr>
 <tr><td><code>composer stan</code></td><td>PHPStan static analysis</td></tr>
 <tr><td><code>composer lint</code></td><td>PHP syntax lint (src + bin + examples)</td></tr>
-<tr><td><code>composer mutate</code></td><td>Infection mutation testing</td></tr>
+<tr><td><code>composer mutate</code></td><td>Infection mutation testing (same coverage-driver requirement)</td></tr>
 <tr><td><code>composer verify:package</code></td><td>Verify package archive is clean</td></tr>
 </table>
+<p>Package verification checks both the declared <code>export-ignore</code> rules and the contents of a real <code>git archive</code> build.</p>
 
 <h2>CI pipeline</h2>
 <p>GitHub Actions CI runs on every push and PR:</p>
 <ul>
 <li><strong>Quality</strong> (PHP 8.3): composer validate, audit, package verify, syntax lint, PHPStan</li>
-<li><strong>Tests</strong> (PHP 8.1, 8.2, 8.3, 8.4): PHPUnit</li>
+<li><strong>Tests</strong> (PHP 8.2, 8.3, 8.4): PHPUnit</li>
 <li><strong>Coverage</strong> (PHP 8.3): Coverage report + threshold check</li>
 <li><strong>Mutation</strong> (PHP 8.3): Infection mutation testing (80% MSI, 85% covered MSI)</li>
 </ul>
 
-<h2>qa:max vs CI equivalence</h2>
-<p><code>composer qa:max</code> runs locally: validate, audit, package verify, syntax lint, PHPStan, coverage with threshold, mutation testing.</p>
-<p>CI runs the same checks split across parallel jobs. The CI quality job includes lint+stan (matching the quality half of qa:max). Coverage and mutation run in separate CI jobs. The commands are identical.</p>
+<h2>Local qa:max and CI scope</h2>
+<p><code>composer qa:max</code> extends <code>composer qa</code> with coverage threshold checks and mutation testing. Coverage and mutation still require a local coverage driver.</p>
+<p>CI covers the same release areas across parallel jobs, but it is not a byte-for-byte mirror of local <code>qa:max</code>: PHPUnit runs on PHP 8.2, 8.3, and 8.4, while the quality, coverage, and mutation jobs run on PHP 8.3.</p>
+<p>Use <code>XDEBUG_MODE=coverage</code>, enable <code>xdebug.mode=coverage</code>, or install PCOV.</p>
 
 <h2>Design principles</h2>
 <ul>

@@ -7,8 +7,10 @@ namespace Lumen\JsonRpc\Doc;
 final class MethodDoc
 {
     /**
-     * @param array<string, array{type: string, description: string, required: bool, default: mixed}> $params
+     * @param array<string, array{type: string, description: string, required: bool, default: mixed, schema?: array<string, mixed>}> $params
      * @param array<int, array{type?: string, code?: string, message?: string, description: string}> $errors
+     * @param ?array<string, mixed> $requestSchema
+     * @param ?array<string, mixed> $resultSchema
      */
     public function __construct(
         public readonly string $name,
@@ -20,6 +22,8 @@ final class MethodDoc
         public readonly array $errors = [],
         public readonly ?string $exampleRequest = null,
         public readonly ?string $exampleResponse = null,
+        public readonly ?array $requestSchema = null,
+        public readonly ?array $resultSchema = null,
     ) {}
 
     /**
@@ -37,6 +41,8 @@ final class MethodDoc
             'errors' => $this->errors,
             'exampleRequest' => $this->exampleRequest,
             'exampleResponse' => $this->exampleResponse,
+            'requestSchema' => $this->requestSchema,
+            'resultSchema' => $this->resultSchema,
         ];
     }
 }

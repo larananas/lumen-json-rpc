@@ -101,6 +101,19 @@ final class DocGeneratorTest extends TestCase
         $this->assertNotNull($health->returnType);
     }
 
+    public function testResultSchemaParsedFromDocblockForAutoDiscoveredMethod(): void
+    {
+        $docs = $this->generator->generate();
+        $health = array_filter($docs, fn($d) => $d->name === 'system.health');
+        $health = reset($health);
+
+        $this->assertNotNull($health->resultSchema);
+        $this->assertSame('object', $health->resultSchema['type']);
+        $this->assertFalse($health->resultSchema['additionalProperties']);
+        $this->assertSame('string', $health->resultSchema['properties']['status']['type']);
+        $this->assertSame('string', $health->resultSchema['properties']['timestamp']['type']);
+    }
+
     public function testMarkdownOutputIsValid(): void
     {
         $docs = $this->generator->generate();
@@ -134,6 +147,29 @@ final class DocGeneratorTest extends TestCase
         $userGet = array_filter($docs, fn($d) => $d->name === 'user.get');
         $method = reset($userGet);
         $this->assertNotEmpty($method->errors);
+    }
+
+    public function testSchemaProviderRequestSchemaIsCapturedInDocs(): void
+    {
+        $handlerPath = realpath(__DIR__ . '/../../../tests/Fixtures') ?: __DIR__ . '/../../../tests/Fixtures';
+        $registry = new HandlerRegistry(
+            [$handlerPath],
+            'Lumen\\JsonRpc\\Tests\\Fixtures\\',
+            '.',
+        );
+        $registry->discover();
+
+        $docs = (new DocGenerator($registry))->generate();
+        $validated = array_values(array_filter($docs, fn($d) => $d->name === 'validatedhandler.create'));
+
+        $this->assertCount(1, $validated);
+        $method = $validated[0];
+        $this->assertSame('object', $method->requestSchema['type']);
+        $this->assertFalse($method->requestSchema['additionalProperties']);
+        $this->assertSame('string', $method->params['email']['schema']['type']);
+        $this->assertSame(1, $method->params['roles']['schema']['minItems']);
+        $this->assertTrue($method->params['email']['required']);
+        $this->assertTrue($method->params['roles']['required']);
     }
 
     public function testNonExistentMethodNotInDocs(): void

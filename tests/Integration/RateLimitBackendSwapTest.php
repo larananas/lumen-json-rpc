@@ -79,13 +79,13 @@ final class RateLimitBackendSwapTest extends TestCase
         $this->assertSame(429, $response3->statusCode);
     }
 
-    public function testSwapViaEngineGetter(): void
+    public function testSwapViaStableServerApi(): void
     {
         $config = $this->createConfigWithRateLimit();
         $server = new JsonRpcServer($config);
 
         $memoryLimiter = new InMemoryRateLimiter(1, 60);
-        $server->getEngine()->getRateLimitManager()->setLimiter($memoryLimiter);
+        $server->setRateLimiter($memoryLimiter);
 
         $request = new HttpRequest(
             body: '{"jsonrpc":"2.0","method":"system.health","id":1}',

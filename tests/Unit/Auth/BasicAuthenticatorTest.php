@@ -47,6 +47,26 @@ final class BasicAuthenticatorTest extends TestCase
         $this->assertNull($auth->authenticateFromHeaders(['Authorization' => "Basic {$encoded}"]));
     }
 
+    public function testPasswordHashReturnsUserContext(): void
+    {
+        $auth = new BasicAuthenticator(
+            header: 'Authorization',
+            users: [
+                'admin' => [
+                    'password_hash' => password_hash('secret', PASSWORD_DEFAULT),
+                    'user_id' => 'admin',
+                    'roles' => ['admin'],
+                ],
+            ],
+        );
+
+        $encoded = base64_encode('admin:secret');
+        $result = $auth->authenticateFromHeaders(['Authorization' => "Basic {$encoded}"]);
+        $this->assertNotNull($result);
+        $this->assertSame('admin', $result->userId);
+        $this->assertSame(['admin'], $result->roles);
+    }
+
     public function testUnknownUserReturnsNull(): void
     {
         $auth = new BasicAuthenticator(

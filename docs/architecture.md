@@ -2,7 +2,7 @@
 
 ## Design Principles
 
-1. **Protocol compliance first** - Core JSON-RPC 2.0 protocol fully implemented; HTTP transport has documented deviations (see Transport Behavior in README)
+1. **Protocol compliance first** - Core JSON-RPC 2.0 behavior is implemented with documented strict defaults and HTTP transport deviations (see Transport Behavior in README)
 2. **Clean separation** - Each class has a single, focused responsibility
 3. **No framework lock-in** - Pure PHP 8.x with minimal dependencies
 4. **Safe defaults** - Security-conscious defaults (debug off, secrets sanitized, safe method resolution)
@@ -21,9 +21,9 @@ HTTP Request
      -> AuthManager + RequestAuthenticator (extract credentials, authenticate, build UserContext)
      -> RateLimitManager (check rate limits)
      -> For each request:
-        -> MiddlewarePipeline (execute middleware stack)
-           -> SchemaValidator (optional, if handler provides schemas)
-           -> HookManager (fire BEFORE_HANDLER)
+        -> HookManager (fire BEFORE_HANDLER)
+        -> SchemaValidator (optional, if handler provides schemas)
+        -> MiddlewarePipeline (execute middleware stack around handler execution)
            -> MethodResolver (map method name to handler class+method)
            -> HandlerDispatcher + HandlerFactory (instantiate handler, invoke method)
            -> ParameterBinder (bind params to method arguments)
@@ -44,6 +44,8 @@ The execution order is formalized and tested. The following guarantees hold for 
 - Batch detection has completed, batch limit has been enforced
 - Authentication has been resolved (if enabled and headers are present)
 - Rate limit has been checked (if enabled)
+- `BEFORE_HANDLER` has already fired for the request
+- Schema validation has already completed when a schema provider is present
 - `RequestContext` is available with correlation ID, headers, client IP, and auth state
 
 **During middleware execution:**
@@ -52,7 +54,7 @@ The execution order is formalized and tested. The following guarantees hold for 
 - `RequestContext` contains all authentication information
 - Middleware executes in registration order (outer first, inner last)
 - Each middleware can short-circuit by returning a `Response` without calling `$next()`
-- `BEFORE_HANDLER` hook fires before the first middleware's `$next()` call
+- `BEFORE_HANDLER` has already fired before the first middleware runs
 - `AFTER_HANDLER` hook fires after handler execution, before the middleware's post-processing
 
 **After middleware completes:**
@@ -63,14 +65,13 @@ The execution order is formalized and tested. The following guarantees hold for 
 **Hook execution order (per request):**
 
 ```
-BEFORE_REQUEST -> [auth hooks] -> [rate limit] -> BEFORE_HANDLER -> [middleware wraps:] -> AFTER_HANDLER -> ON_RESPONSE -> AFTER_REQUEST
+BEFORE_REQUEST -> [auth hooks] -> [rate limit] -> BEFORE_HANDLER -> [schema validation] -> [middleware wraps: handler] -> AFTER_HANDLER -> ON_RESPONSE -> AFTER_REQUEST
 ```
 
 **What is NOT guaranteed before middleware:**
 
 - Method resolution has NOT occurred yet (method may still be not found)
 - Parameter binding has NOT occurred yet (params may be invalid)
-- Schema validation has NOT occurred yet (even if enabled)
 
 ## Component Responsibilities
 
@@ -106,7 +107,7 @@ BEFORE_REQUEST -> [auth hooks] -> [rate limit] -> BEFORE_HANDLER -> [middleware 
 - `HandlerFactoryInterface`: Contract for custom handler instantiation (DI)
 - `DefaultHandlerFactory`: Default factory (RequestContext injection, optional params)
 - `ParameterBinder`: Binds positional or named params to method arguments
-- `HandlerRegistry`: Discovers all available handlers and methods
+- `HandlerRegistry`: Discovers all available handlers and methods from top-level handler files in configured paths
 - `ProcedureDescriptor`: Value object for explicit procedure registration with metadata
 - `MethodResolution`: Value object representing a resolved handler class + method
 
@@ -233,6 +234,8 @@ class MyAuth implements \Lumen\JsonRpc\Auth\AuthenticatorInterface {
 }
 ```
 
+For custom header parsing or non-standard credential extraction, implement `RequestAuthenticatorInterface` and register it through `JsonRpcServer::setRequestAuthenticator()`.
+
 ### Custom Rate Limiter
 
 Implement `RateLimiterInterface`:
@@ -274,14 +277,15 @@ $registry->registerDescriptor(new ProcedureDescriptor(
 ));
 ```
 
-Descriptor metadata is used by the documentation generators (including OpenRPC).
+Descriptor metadata is used by the documentation generators (including OpenRPC). Runtime request schemas from `RpcSchemaProviderInterface` are also reused by the JSON and OpenRPC generators when available.
+For richer response contracts, explicit descriptor metadata may include `resultSchema`, and auto-discovered handlers may provide `@result-schema {...}` in method docblocks; both flow through to generated JSON/OpenRPC result definitions.
 
 ### OpenRPC Export
 
 Generate machine-readable OpenRPC specification:
 
 ```bash
-php bin/generate-docs.php --format=openrpc --output=docs/openrpc.json
+php bin/generate-docs.php --config=./config.php --format=openrpc --output=docs/openrpc.json
 ```
 
 ### Hooks
@@ -295,3 +299,5 @@ $server->getHooks()->register(
     }
 );
 ```
+
+Hooks run inline with request execution. By default, hook exceptions are isolated, logged, and skipped so later hooks and request handling can continue. Set `hooks.isolate_exceptions` to `false` if you need hook failures to abort the request.

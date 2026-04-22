@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Lumen\JsonRpc\Tests\Integration;
 
 use Lumen\JsonRpc\Server\JsonRpcServer;
+use Lumen\JsonRpc\Support\Compressor;
 use Lumen\JsonRpc\Support\HookPoint;
 use PHPUnit\Framework\TestCase;
+use ReflectionProperty;
 
 final class CorrectionTest extends TestCase
 {
@@ -15,6 +17,11 @@ final class CorrectionTest extends TestCase
     protected function setUp(): void
     {
         $this->initHandlerPath();
+    }
+
+    protected function tearDown(): void
+    {
+        Compressor::resetCache();
     }
 
     // === FIX #1: Auth enforcement ===
@@ -87,6 +94,51 @@ final class CorrectionTest extends TestCase
         $data = json_decode($response->body, true);
         $this->assertArrayHasKey('result', $data);
         $this->assertEquals('ok', $data['result']['status']);
+    }
+
+    public function testExactProtectedMethodOnlyProtectsThatMethod(): void
+    {
+        $server = $this->createServer([
+            'auth' => [
+                'enabled' => true,
+                'jwt' => ['secret' => 'test-secret', 'algorithm' => 'HS256'],
+                'protected_methods' => ['user.get'],
+            ],
+        ]);
+
+        $protectedBody = json_encode(['jsonrpc' => '2.0', 'method' => 'user.get', 'params' => ['id' => 1], 'id' => 1]);
+        $protectedResponse = $server->handle($this->createRequest($protectedBody));
+        $protectedData = json_decode($protectedResponse->body, true);
+
+        $this->assertEquals(-32001, $protectedData['error']['code']);
+
+        $publicBody = json_encode(['jsonrpc' => '2.0', 'method' => 'user.list', 'id' => 2]);
+        $publicResponse = $server->handle($this->createRequest($publicBody));
+        $publicData = json_decode($publicResponse->body, true);
+
+        $this->assertArrayHasKey('result', $publicData);
+    }
+
+    public function testProtectedPrefixesStillRespectCustomMethodSeparator(): void
+    {
+        $server = $this->createServer([
+            'handlers' => [
+                'paths' => [$this->handlerPath],
+                'namespace' => 'App\\Handlers\\',
+                'method_separator' => '_',
+            ],
+            'auth' => [
+                'enabled' => true,
+                'jwt' => ['secret' => 'test-secret', 'algorithm' => 'HS256'],
+                'protected_methods' => ['user.'],
+            ],
+        ]);
+
+        $body = json_encode(['jsonrpc' => '2.0', 'method' => 'user_get', 'params' => ['id' => 1], 'id' => 1]);
+        $response = $server->handle($this->createRequest($body));
+        $data = json_decode($response->body, true);
+
+        $this->assertEquals(-32001, $data['error']['code']);
     }
 
     // === FIX #2: Stale context regression ===
@@ -218,6 +270,39 @@ final class CorrectionTest extends TestCase
         $this->assertArrayNotHasKey('Content-Encoding', $response->headers);
     }
 
+    public function testGzippedRequestReturnsErrorWhenZlibUnavailable(): void
+    {
+        $this->forceZlibAvailability(false);
+
+        $server = $this->createServer();
+        $json = json_encode(['jsonrpc' => '2.0', 'method' => 'system.health', 'id' => 1]);
+        $gzipped = gzencode($json);
+        $response = $server->handle($this->createRequest($gzipped, 'POST', [
+            'Content-Encoding' => 'gzip',
+        ]));
+
+        $data = json_decode($response->body, true);
+        $this->assertSame(-32600, $data['error']['code']);
+    }
+
+    public function testResponseNotGzippedWhenZlibUnavailableEvenIfEnabledAndAccepted(): void
+    {
+        $this->forceZlibAvailability(false);
+
+        $server = $this->createServer([
+            'compression' => ['response_gzip' => true],
+        ]);
+        $body = json_encode(['jsonrpc' => '2.0', 'method' => 'system.health', 'id' => 1]);
+        $response = $server->handle($this->createRequest($body, 'POST', [
+            'Accept-Encoding' => 'gzip',
+        ]));
+
+        $this->assertArrayNotHasKey('Content-Encoding', $response->headers);
+        $this->assertArrayNotHasKey('Vary', $response->headers);
+        $data = json_decode($response->body, true);
+        $this->assertSame('ok', $data['result']['status']);
+    }
+
     // === FIX #7: ETag / If-None-Match ===
 
     public function testEtagEmittedWhenFingerprintingEnabled(): void
@@ -245,6 +330,61 @@ final class CorrectionTest extends TestCase
             'If-None-Match' => $etag,
         ]));
         $this->assertEquals(304, $response2->statusCode);
+    }
+
+    public function testConditionalRequestPreservesVaryHeaderForGzipNegotiation(): void
+    {
+        if (!Compressor::isZlibAvailable()) {
+            $this->markTestSkipped('gzip negotiation metadata requires ext-zlib');
+        }
+
+        $server = $this->createServer([
+            'response_fingerprint' => ['enabled' => true],
+            'compression' => ['response_gzip' => true],
+        ]);
+        $body = json_encode(['jsonrpc' => '2.0', 'method' => 'system.health', 'id' => 1]);
+
+        $response1 = $server->handle($this->createRequest($body, 'POST', [
+            'Accept-Encoding' => 'gzip',
+        ]));
+        $etag = $response1->headers['ETag'];
+
+        $response2 = $server->handle($this->createRequest($body, 'POST', [
+            'Accept-Encoding' => 'gzip',
+            'If-None-Match' => $etag,
+        ]));
+
+        $this->assertEquals(304, $response2->statusCode);
+        $this->assertSame('', $response2->body);
+        $this->assertSame($etag, $response2->headers['ETag'] ?? null);
+        $this->assertSame('Accept-Encoding', $response2->headers['Vary'] ?? null);
+    }
+
+    public function testConditionalRequestDoesNotReuseGzipEtagForIdentityVariant(): void
+    {
+        if (!Compressor::isZlibAvailable()) {
+            $this->markTestSkipped('representation-specific ETag test requires ext-zlib');
+        }
+
+        $server = $this->createServer([
+            'response_fingerprint' => ['enabled' => true],
+            'compression' => ['response_gzip' => true],
+        ]);
+        $body = json_encode(['jsonrpc' => '2.0', 'method' => 'system.health', 'id' => 1]);
+
+        $gzipResponse = $server->handle($this->createRequest($body, 'POST', [
+            'Accept-Encoding' => 'gzip',
+        ]));
+        $gzipEtag = $gzipResponse->headers['ETag'];
+
+        $identityResponse = $server->handle($this->createRequest($body, 'POST', [
+            'If-None-Match' => $gzipEtag,
+        ]));
+
+        $this->assertSame(200, $identityResponse->statusCode);
+        $this->assertArrayNotHasKey('Content-Encoding', $identityResponse->headers);
+        $this->assertArrayHasKey('ETag', $identityResponse->headers);
+        $this->assertNotSame($gzipEtag, $identityResponse->headers['ETag']);
     }
 
     public function testConditionalRequestWithNonMatchingEtagReturns200(): void
@@ -414,6 +554,15 @@ final class CorrectionTest extends TestCase
         $this->assertArrayHasKey('result', $data);
     }
 
+    public function testExtraMembersAcceptedByDefault(): void
+    {
+        $server = $this->createServer();
+        $body = json_encode(['jsonrpc' => '2.0', 'method' => 'system.health', 'id' => 1, 'extra' => 'value']);
+        $response = $server->handle($this->createRequest($body));
+        $data = json_decode($response->body, true);
+        $this->assertArrayHasKey('result', $data);
+    }
+
     public function testExtraMembersRejectedInStrictMode(): void
     {
         $server = $this->createServer([
@@ -441,6 +590,7 @@ final class CorrectionTest extends TestCase
         $server = $this->createServer(['health' => ['enabled' => false]]);
         $response = $server->handle($this->createRequest('', 'GET'));
         $this->assertEquals(405, $response->statusCode);
+        $this->assertSame('POST', $response->headers['Allow'] ?? null);
     }
 
     // === FIX #12: Handler-thrown JsonRpcException preservation ===
@@ -468,5 +618,11 @@ final class CorrectionTest extends TestCase
         ]));
         $data = json_decode($response->body, true);
         $this->assertEquals(-32700, $data['error']['code']);
+    }
+
+    private function forceZlibAvailability(bool $available): void
+    {
+        $property = new ReflectionProperty(Compressor::class, 'zlibAvailable');
+        $property->setValue(null, $available);
     }
 }

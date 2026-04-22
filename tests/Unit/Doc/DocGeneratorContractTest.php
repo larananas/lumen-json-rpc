@@ -65,6 +65,13 @@ final class DocGeneratorContractTest extends TestCase
                     ],
                     'returnType' => 'array',
                     'returnDescription' => 'Result object',
+                    'resultSchema' => [
+                        'type' => 'object',
+                        'required' => ['total'],
+                        'properties' => [
+                            'total' => ['type' => 'integer'],
+                        ],
+                    ],
                     'requiresAuth' => true,
                 ],
             ),
@@ -80,5 +87,7 @@ final class DocGeneratorContractTest extends TestCase
         $this->assertEquals('array', $docs[0]->returnType);
         $this->assertEquals('Result object', $docs[0]->returnDescription);
         $this->assertArrayHasKey('id', $docs[0]->params);
+        $this->assertSame('object', $docs[0]->resultSchema['type']);
+        $this->assertSame('integer', $docs[0]->resultSchema['properties']['total']['type']);
     }
 }

@@ -50,16 +50,19 @@ final class JsonRpcEngineTest extends TestCase
         $fingerprinter = new ResponseFingerprinter(false, 'sha256');
         $validator = new RequestValidator(true);
         $batchProcessor = new BatchProcessor($validator, 100);
+        $handlerPaths = $this->handlerPaths($config);
+        $handlerNamespace = $this->handlerNamespace($config);
+        $handlerSeparator = $this->handlerSeparator($config);
         $registry = new HandlerRegistry(
-            $config->get('handlers.paths', []),
-            $config->get('handlers.namespace', 'App\\Handlers\\'),
-            $config->get('handlers.method_separator', '.'),
+            $handlerPaths,
+            $handlerNamespace,
+            $handlerSeparator,
         );
         $registry->discover();
         $resolver = new MethodResolver(
-            $config->get('handlers.paths', []),
-            $config->get('handlers.namespace', 'App\\Handlers\\'),
-            $config->get('handlers.method_separator', '.'),
+            $handlerPaths,
+            $handlerNamespace,
+            $handlerSeparator,
         );
         $dispatcher = new HandlerDispatcher($resolver, new ParameterBinder(), $registry);
 
@@ -67,6 +70,48 @@ final class JsonRpcEngineTest extends TestCase
             $config, $logger, $hooks, $authManager, $rateLimitManager,
             $fingerprinter, $batchProcessor, $dispatcher, $registry,
         );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function handlerPaths(Config $config): array
+    {
+        $paths = $config->get('handlers.paths', []);
+        if (!is_array($paths)) {
+            throw new \RuntimeException('handlers.paths must be an array');
+        }
+
+        $strings = [];
+        foreach ($paths as $path) {
+            if (!is_string($path) || $path === '') {
+                throw new \RuntimeException('handlers.paths must contain only non-empty strings');
+            }
+
+            $strings[] = $path;
+        }
+
+        return $strings;
+    }
+
+    private function handlerNamespace(Config $config): string
+    {
+        $namespace = $config->get('handlers.namespace', 'App\\Handlers\\');
+        if (!is_string($namespace)) {
+            throw new \RuntimeException('handlers.namespace must be a string');
+        }
+
+        return $namespace;
+    }
+
+    private function handlerSeparator(Config $config): string
+    {
+        $separator = $config->get('handlers.method_separator', '.');
+        if (!is_string($separator)) {
+            throw new \RuntimeException('handlers.method_separator must be a string');
+        }
+
+        return $separator;
     }
 
     public function testSingleRequestReturnsResult(): void

@@ -55,6 +55,21 @@ final class AuthDriverValidationTest extends TestCase
         $this->assertInstanceOf(\Lumen\JsonRpc\Server\JsonRpcServer::class, $server);
     }
 
+    public function testBasicDriverAcceptsPasswordHashOnly(): void
+    {
+        $server = $this->createServer([
+            'auth' => [
+                'enabled' => true,
+                'driver' => 'basic',
+                'basic' => [
+                    'users' => ['admin' => ['password_hash' => password_hash('secret', PASSWORD_DEFAULT)]],
+                ],
+            ],
+        ]);
+
+        $this->assertInstanceOf(\Lumen\JsonRpc\Server\JsonRpcServer::class, $server);
+    }
+
     public function testInvalidDriverThrowsException(): void
     {
         $this->expectException(\RuntimeException::class);
@@ -106,6 +121,22 @@ final class AuthDriverValidationTest extends TestCase
                 'enabled' => true,
                 'driver' => 'basic',
                 'basic' => ['users' => []],
+            ],
+        ]);
+    }
+
+    public function testBasicDriverUserWithoutPasswordMaterialThrowsException(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('auth.basic.users.admin must define either password or password_hash');
+
+        $this->createServer([
+            'auth' => [
+                'enabled' => true,
+                'driver' => 'basic',
+                'basic' => [
+                    'users' => ['admin' => ['user_id' => 'admin']],
+                ],
             ],
         ]);
     }

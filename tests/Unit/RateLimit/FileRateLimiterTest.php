@@ -95,16 +95,12 @@ final class FileRateLimiterTest extends TestCase
   #[WithoutErrorHandler]
   public function testFailOpenOnBadPath(): void
   {
-    if (PHP_OS_FAMILY === "Windows" || !is_dir("/proc")) {
-      $this->markTestSkipped(
-        "Bad-path warning behavior is only tested on Unix-like systems with /proc",
-      );
-    }
+    $blockingPath = $this->createBlockingStoragePath('fail-open');
 
     $limiter = new FileRateLimiter(
       10,
       60,
-      "/proc/jsonrpc_rate_limit_fail_open_" . uniqid("", true),
+      $blockingPath,
       failOpen: true,
     );
 
@@ -138,16 +134,12 @@ final class FileRateLimiterTest extends TestCase
   #[WithoutErrorHandler]
   public function testFailClosedOnBadPath(): void
   {
-    if (PHP_OS_FAMILY === "Windows" || !is_dir("/proc")) {
-      $this->markTestSkipped(
-        "Bad-path warning behavior is only tested on Unix-like systems with /proc",
-      );
-    }
+    $blockingPath = $this->createBlockingStoragePath('fail-closed');
 
     $limiter = new FileRateLimiter(
       10,
       60,
-      "/proc/jsonrpc_rate_limit_fail_closed_" . uniqid("", true),
+      $blockingPath,
       failOpen: false,
     );
 
@@ -176,5 +168,13 @@ final class FileRateLimiterTest extends TestCase
       "fail-closed denying request",
       $warnings[0],
     );
+  }
+
+  private function createBlockingStoragePath(string $prefix): string
+  {
+    $path = $this->testDir . '/' . $prefix . '-' . uniqid('', true) . '.tmp';
+    touch($path);
+
+    return $path;
   }
 }

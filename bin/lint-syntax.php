@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-if (php_sapi_name() !== 'cli') {
+if (!in_array(PHP_SAPI, ['cli', 'phpdbg'], true)) {
     fwrite(STDERR, "This script must be run from the command line.\n");
     exit(1);
 
@@ -25,15 +25,25 @@ foreach ($dirs as $dir) {
     );
 
     foreach ($it as $file) {
+        if (!$file instanceof SplFileInfo) {
+            continue;
+        }
+
         if ($file->getExtension() !== 'php') {
             continue;
         }
 
         $checked++;
         $path = $file->getRealPath();
+        if ($path === false) {
+            $failures++;
+            fwrite(STDERR, "Cannot resolve file path for syntax check.\n");
+            continue;
+        }
+
         $output = [];
         $result = null;
-        exec(PHP_BINARY . ' -l ' . escapeshellarg($path) . ' 2>&1', $output, $result);
+        exec(resolvePhpLintBinary() . ' -l ' . escapeshellarg($path) . ' 2>&1', $output, $result);
 
         if ($result !== 0) {
             $failures++;
@@ -54,3 +64,17 @@ if ($failures > 0) {
 
 echo "Syntax check passed: {$checked} file(s) OK.\n";
 exit(0);
+
+function resolvePhpLintBinary(): string
+{
+    if (PHP_SAPI !== 'phpdbg') {
+        return escapeshellarg(PHP_BINARY);
+    }
+
+    $phpCli = PHP_BINDIR . DIRECTORY_SEPARATOR . 'php' . (DIRECTORY_SEPARATOR === '\\' ? '.exe' : '');
+    if (is_file($phpCli)) {
+        return escapeshellarg($phpCli);
+    }
+
+    return escapeshellarg(PHP_BINARY);
+}

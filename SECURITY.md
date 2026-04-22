@@ -23,7 +23,7 @@ If you discover a security vulnerability in this project, **please report it pri
 
 ## Supported Versions
 
-Only the latest stable release is actively supported. Security fixes are applied to the current major version branch.
+Security fixes target the latest stable release line. Older releases may not receive updates.
 
 ## Scope
 

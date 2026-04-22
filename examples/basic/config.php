@@ -51,7 +51,7 @@ return [
         'strategy' => 'ip',
         'storage_path' => __DIR__ . '/../../storage/rate_limit',
         'batch_weight' => 1,
-        'fail_open' => true,
+        'fail_open' => false,
     ],
     'debug' => false,
     'notifications' => [
@@ -66,7 +66,7 @@ return [
         'enabled' => true,
     ],
     'validation' => [
-        'strict' => true,
+        'strict' => false,
     ],
     'content_type' => [
         'strict' => false,

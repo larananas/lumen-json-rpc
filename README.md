@@ -1,7 +1,7 @@
 # Lumen JSON-RPC
 
 <p align="center">
-  <img src=".github/assets/logo.svg" alt="Lumen JSON-RPC logo" width="420">
+  <img src="https://larananas.github.io/lumen-json-rpc/logo.svg" alt="Lumen JSON-RPC logo" width="420">
 </p>
 
 <div align="center">
@@ -13,9 +13,9 @@
 
 </div>
 
-> ✨ Framework-free JSON-RPC for PHP — strict `handler.method` routing, strong defaults, auth drivers, gzip, rate limiting, middleware, schema validation, direct core usage, and docs generation.
+> ✨ Framework-free JSON-RPC for PHP — strict `handler.method` routing, strong defaults, auth drivers, gzip, rate limiting, middleware, lightweight schema validation, direct JSON usage, and docs generation.
 
-A production-grade, framework-free JSON-RPC server library for modern PHP.
+A framework-free JSON-RPC 2.0 server library for modern PHP.
 
 It keeps the boring parts solid — request validation, batching, auth, compression, rate limiting, hooks, docs, and predictable handler execution — while keeping your application code explicit and reviewable.
 
@@ -36,7 +36,7 @@ Lumen JSON-RPC is built for developers who want a **real server library**, not a
 - 🧱 **Standalone library** — plain PHP, no framework required
 - 🎯 **Strict `handler.method` mapping** — predictable and easy to review
 - 🔐 **Auth drivers built in** — JWT, API key, or HTTP Basic
-- 🧩 **Direct core usage** — use HTTP by default, or call the engine directly
+- 🧩 **Direct JSON usage** — use HTTP by default, or call `JsonRpcServer::handleJson()` directly
 - 🧪 **Strong protocol handling** — strict request validation, batching, notifications
 - 🛡️ **Safe defaults** — reserved methods blocked, magic methods excluded, public instance methods only
 - 🗜️ **Compression + rate limiting** — useful production features without extra packages
@@ -69,12 +69,25 @@ A clean JSON-RPC 2.0 server for PHP that stays:
 composer require larananas/lumen-json-rpc
 ```
 
+Requires `PHP >=8.2` and `ext-json`.
+
+Composer consumers install the normal tagged package archive. Repository-only assets such as tests, examples, source docs, CI workflows, and docs-site tooling are intentionally excluded from package archives.
+
 ### Optional extras
 
 - `ext-zlib` → enables gzip request / response support
 - `firebase/php-jwt` → enables broader JWT algorithm support
 
 Without optional extras, the library still works.
+
+---
+
+## ✅ Quality and release checks
+
+- `composer qa` runs the standard local release gate: validate, audit, package verify, lint, PHPStan level 9, and PHPUnit
+- `composer qa:max` extends that local gate with coverage threshold checks and mutation testing; it requires a local coverage driver
+- `composer test:coverage` and `composer mutate` require a local coverage driver: use `XDEBUG_MODE=coverage`, enable `xdebug.mode=coverage`, or install PCOV
+- CI covers the same release areas across `quality`, `tests`, `coverage`, and `mutation` jobs; PHPUnit runs on PHP 8.2/8.3/8.4, while quality, coverage, and mutation run on PHP 8.3
 
 ---
 
@@ -162,6 +175,7 @@ That means:
 - `user.get` → handler class `User`
 - method `get()` on that handler
 - discovered from your configured handlers path + namespace
+- auto-discovery only scans top-level handler files in each configured path; nested directories are not discovered
 
 No manual method registry.
 No hidden auto-generated procedures.
@@ -173,7 +187,7 @@ No “where is this route even defined?” nonsense.
 
 ### 🔐 Multiple auth drivers
 
-You can protect method prefixes with:
+You can protect exact methods or method prefixes with:
 
 - JWT _(default driver when auth is enabled)_
 - API key
@@ -187,9 +201,11 @@ You can protect method prefixes with:
 ],
 ```
 
-### 🧩 Direct core usage
+Use exact method names like `user.get` to protect one procedure, or trailing-separator prefixes like `user.` to protect a whole handler surface.
 
-HTTP is still the default, but you can also call the engine directly when you need transport-independent usage.
+### 🧩 Direct JSON usage
+
+HTTP is still the default, but the stable transport-agnostic entry point is `JsonRpcServer::handleJson()`.
 
 ```php
 <?php
@@ -209,6 +225,18 @@ $json = $server->handleJson(
 );
 
 echo $json;
+```
+
+If you need to resolve auth from request headers before handing the context around, use the stable server API instead of the internal engine:
+
+```php
+$context = $server->authenticateContext($context);
+```
+
+If you need a custom header-based auth flow, install it on the stable server surface:
+
+```php
+$server->setRequestAuthenticator(new MyRequestAuthenticator());
 ```
 
 ### 🏗️ Handler factory for lightweight DI
@@ -279,6 +307,9 @@ $registry->registerDescriptors([
 ```
 
 Explicit descriptors work alongside auto-discovered handlers. Descriptor metadata is used by documentation generators.
+When you need richer machine-readable contracts, descriptor metadata can also provide `resultSchema` for generated JSON/OpenRPC output.
+
+Auto-discovered handlers can also provide richer result contracts with a docblock tag such as `@result-schema {"type":"object",...}`.
 
 ### ✅ Optional schema validation
 
@@ -319,6 +350,10 @@ Enable it with:
 
 If you do nothing, normal parameter binding still works exactly fine.
 
+The schema support is intentionally a lightweight subset for runtime request validation. It is not a full JSON Schema implementation.
+
+Generated JSON and OpenRPC docs also reuse these request schemas when available, and explicit descriptor metadata or handler docblock `@result-schema` tags can provide richer result contracts, so machine-readable docs can carry both parameter constraints and richer result contracts.
+
 ---
 
 ## 🆚 At a glance: how it compares
@@ -330,7 +365,7 @@ It is intentionally simplified and focused on developer-facing features.
 | ------------------------------------------------- | -------------: | -----------: | -------------: | ----------------: |
 | Framework-free server                             |             ✅ |           ✅ |             ✅ |                ✅ |
 | HTTP support out of the box                       |             ✅ |           ❌ |             ✅ |                ✅ |
-| Direct core usage without HTTP                    |             ✅ |           ✅ |             ✅ |                ❌ |
+| Direct JSON usage without HTTP                    |             ✅ |           ✅ |             ✅ |                ❌ |
 | Strict `handler.method` auto-discovery            |             ✅ |           ❌ |             ❌ |                ❌ |
 | Middleware pipeline                               |             ✅ |           ✅ |             ❌ |                ✅ |
 | Optional advanced param validation                |             ✅ |           ✅ |            🟡~ |                ❌ |
@@ -475,7 +510,7 @@ This keeps execution paths explicit and limits surprises.
     'basic' => [
         'users' => [
             'admin' => [
-                'password' => 'secret',
+                'password_hash' => password_hash('secret', PASSWORD_DEFAULT),
                 'user_id' => 'admin',
                 'roles' => ['admin'],
             ],
@@ -483,6 +518,8 @@ This keeps execution paths explicit and limits surprises.
     ],
 ],
 ```
+
+Prefer `password_hash` for production credentials. Plaintext `password` remains supported for development and tests.
 
 ### Access auth data in handlers
 
@@ -499,10 +536,10 @@ public function me(RequestContext $context): array
 
 See:
 
-- [docs/authentication.md](docs/authentication.md)
-- [examples/auth/](examples/auth/)
+- [Authentication guide](https://larananas.github.io/lumen-json-rpc/authentication.html)
+- [Auth example (repository)](https://github.com/larananas/lumen-json-rpc/tree/main/examples/auth)
 
-> **Apache note:** depending on your setup, you may need to forward the `Authorization` header explicitly. See the authentication docs and the auth example for a working `.htaccess` snippet.
+> **Apache note:** depending on your setup, you may need to forward the `Authorization` header explicitly. See the authentication guide and the auth example for a working `.htaccess` snippet.
 
 ---
 
@@ -516,9 +553,11 @@ File-based rate limiting with atomic file locking:
     'max_requests' => 100,
     'window_seconds' => 60,
     'strategy' => 'ip',
-    'fail_open' => true,
+    'fail_open' => false,
 ],
 ```
+
+By default, rate limiting is fail-closed: if the storage backend cannot be opened or locked, the request is denied with HTTP `429` instead of silently bypassing the limit. Set `fail_open: true` only when you explicitly prefer availability over strict enforcement.
 
 Rate-limited requests return:
 
@@ -536,7 +575,7 @@ Batch weight counts actual items received, and consumption is atomic.
 The rate limit storage is pluggable. Implement `RateLimiterInterface` to use Redis, Memcached, or any backend:
 
 ```php
-$server->getEngine()->getRateLimitManager()->setLimiter(new MyRedisRateLimiter());
+$server->setRateLimiter(new MyRedisRateLimiter());
 ```
 
 An `InMemoryRateLimiter` is included for testing.
@@ -555,6 +594,7 @@ Batch requests are limited to `batch.max_items` (default: 100):
 - Oversized batch returns `-32600 Invalid Request` with the limit in the error data
 - Batch of only notifications returns HTTP 204
 - Mixed batches return responses only for non-notification requests
+- Mixed valid/invalid batches are not guaranteed to preserve original input order in the response array
 
 ---
 
@@ -610,6 +650,8 @@ $server->getHooks()->register(
 );
 ```
 
+Hook callbacks run inline. By default, thrown hook exceptions are logged and suppressed so request execution can continue. Set `hooks.isolate_exceptions` to `false` if you want hook failures to abort the request instead.
+
 ---
 
 ## 🌐 Transport behavior
@@ -617,8 +659,17 @@ $server->getHooks()->register(
 - `POST /` handles JSON-RPC requests
 - empty POST body returns `-32600 Invalid Request`
 - `GET /` returns a health/status JSON when `health.enabled` is `true`
-- non-POST, non-GET methods return HTTP `405`
+- unsupported methods return HTTP `405`, with `Allow: POST, GET` when health checks are enabled and `Allow: POST` when they are not
 - set `content_type.strict: true` to require `application/json` on POST
+
+HTTP status codes are reserved for transport-level outcomes:
+
+- JSON-RPC parse/protocol/application errors return HTTP `200` with a JSON-RPC error body
+- all-notification batches return HTTP `204` with no body
+- successful conditional requests may return HTTP `304`
+- fingerprint `ETag`s are representation-specific under gzip negotiation, and conditional `304` responses preserve cache-relevant headers such as `ETag` and `Vary: Accept-Encoding`
+- transport rate limiting returns HTTP `429` plus a JSON-RPC error body
+- unsupported HTTP methods return HTTP `405`
 
 ---
 
@@ -646,18 +697,36 @@ This keeps handler signatures clean without turning binding into magic.
 Generate docs from handler metadata:
 
 ```bash
-php bin/generate-docs.php --format=markdown --output=docs/api.md
-php bin/generate-docs.php --format=html --output=docs/api.html
-php bin/generate-docs.php --format=json --output=docs/api.json
-php bin/generate-docs.php --format=openrpc --output=docs/openrpc.json
+php bin/generate-docs.php --config=./config.php --format=markdown --output=docs/api.md
+php bin/generate-docs.php --config=./config.php --format=html --output=docs/api.html
+php bin/generate-docs.php --config=./config.php --format=json --output=docs/api.json
+php bin/generate-docs.php --config=./config.php --format=openrpc --output=docs/openrpc.json
 ```
+
+Adjust `--config` to your application's config file path. The docs generator is included in Composer package archives; repository docs, examples, and the docs-site builder remain repository-only.
 
 Supported formats:
 
 - `markdown` — Markdown documentation (default)
 - `html` — Styled HTML page
 - `json` — Machine-readable JSON
-- `openrpc` — [OpenRPC 1.3.2](https://spec.open-rpc.org/) specification for client generation and tooling
+- `openrpc` — [OpenRPC 1.3.2](https://spec.open-rpc.org/) specification for client generation and tooling, validated in tests against the bundled schema fixture
+
+---
+
+## 🔒 Stability and versioning
+
+The stable public surface is centered on `JsonRpcServer` and its documented collaborators such as `RequestContext`, `HandlerFactoryInterface`, `MiddlewareInterface`, `RateLimiterInterface`, hooks, procedure descriptors, and stable server accessors like `getHooks()`, `getRegistry()`, and `getLogger()`.
+
+`JsonRpcServer::getEngine()` is available as an escape hatch for advanced integrations, but `JsonRpcEngine` remains internal and is not covered by backward-compatibility guarantees between minor releases.
+
+Release policy:
+
+- patch releases may fix bugs, docs, tests, packaging, and internal implementation details without changing the documented stable public API
+- minor releases may add new public capabilities, but internal APIs such as `JsonRpcEngine` may change without backward-compatibility guarantees
+- major releases may change the documented stable public API
+
+Stable public releases follow Semantic Versioning. Compatibility-relevant changes are tracked in the [changelog](https://github.com/larananas/lumen-json-rpc/blob/main/CHANGELOG.md).
 
 ---
 
@@ -665,15 +734,15 @@ Supported formats:
 
 ### Basic example
 
-A minimal server with handlers and no auth:
+A minimal server with handlers and no auth. Repository examples are published with the source repository, not the package archive:
 
-- [examples/basic/](examples/basic/)
+- [Basic example (repository)](https://github.com/larananas/lumen-json-rpc/tree/main/examples/basic)
 
 ### Auth example
 
 Shows JWT auth with a working example app:
 
-- [examples/auth/](examples/auth/)
+- [Auth example (repository)](https://github.com/larananas/lumen-json-rpc/tree/main/examples/auth)
 
 ### Advanced example
 
@@ -683,13 +752,13 @@ Shows:
 - middleware
 - schema validation
 
-- [examples/advanced/](examples/advanced/)
+- [Advanced example (repository)](https://github.com/larananas/lumen-json-rpc/tree/main/examples/advanced)
 
 ### Browser demo
 
 A tiny HTML page that lets you send raw JSON-RPC requests and inspect the raw response:
 
-- [examples/browser-demo/](examples/browser-demo/)
+- [Browser demo (repository)](https://github.com/larananas/lumen-json-rpc/tree/main/examples/browser-demo)
 
 ---
 
@@ -718,11 +787,11 @@ A tiny HTML page that lets you send raw JSON-RPC requests and inspect the raw re
 
 ## ⚙️ Configuration
 
-See [docs/configuration.md](docs/configuration.md) for the full configuration reference with all keys, defaults, and descriptions.
+See the [configuration guide](https://larananas.github.io/lumen-json-rpc/configuration.html) for the full configuration reference with all keys, defaults, and descriptions.
 
-For architecture details and the request lifecycle, see [docs/architecture.md](docs/architecture.md).
+For architecture details and the request lifecycle, see the [architecture guide](https://larananas.github.io/lumen-json-rpc/architecture.html).
 
-For authentication-specific setup and integration notes, see [docs/authentication.md](docs/authentication.md).
+For authentication-specific setup and integration notes, see the [authentication guide](https://larananas.github.io/lumen-json-rpc/authentication.html).
 
 ---
 
@@ -747,7 +816,7 @@ Security-sensitive behavior includes:
 - log injection prevented (newlines escaped, context JSON-encoded)
 - rate limiting uses atomic file locking with configurable fail-open / fail-closed behavior
 
-See [docs/security.md](docs/security.md) for details.
+See the [security guide](https://larananas.github.io/lumen-json-rpc/security.html) for details.
 
 ---
 
@@ -759,8 +828,10 @@ This repository includes a static documentation site published via GitHub Pages.
 
 ### Build the site locally
 
+This is a repository-only maintenance step. The generated `docs-site/` output is gitignored, and the source docs plus site builder are export-ignored from package archives.
+
 ```bash
-composer docs:build
+php bin/build-docs-site.php
 ```
 
 This generates the `docs-site/` directory with 15 HTML pages.
@@ -790,7 +861,7 @@ To use a custom domain:
 3. Build the docs with the `DOCS_CNAME` environment variable set:
 
 ```bash
-DOCS_CNAME=your-domain.example.com composer docs:build
+DOCS_CNAME=your-domain.example.com php bin/build-docs-site.php
 ```
 
 For CI deployments, add `DOCS_CNAME` as a repository secret and reference it in the workflow.

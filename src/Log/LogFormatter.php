@@ -41,13 +41,14 @@ final class LogFormatter
     }
 
     /**
-     * @param array<string, mixed> $data
-     * @return array<string, mixed>
+     * @param array<int|string, mixed> $data
+     * @return array<int|string, mixed>
      */
     private function sanitize(array $data): array
     {
         foreach ($data as $key => $value) {
             if (is_array($value)) {
+                /** @var array<int|string, mixed> $value */
                 $data[$key] = $this->sanitize($value);
             } elseif ($this->isSensitiveKey((string)$key)) {
                 $data[$key] = '***REDACTED***';

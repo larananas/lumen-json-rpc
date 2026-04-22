@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Lumen\JsonRpc\Tests\Integration;
 
-use Lumen\JsonRpc\Config\Config;
-use Lumen\JsonRpc\Core\JsonRpcEngine;
 use Lumen\JsonRpc\Server\JsonRpcServer;
 use Lumen\JsonRpc\Support\RequestContext;
 use PHPUnit\Framework\TestCase;
@@ -52,10 +50,9 @@ final class CoreDirectUsageTest extends TestCase
         $this->assertNull($response);
     }
 
-    public function testDirectEngineUsage(): void
+    public function testDirectJsonUsageWithCustomContext(): void
     {
         $server = $this->createServer();
-        $engine = $server->getEngine();
 
         $json = json_encode(['jsonrpc' => '2.0', 'method' => 'system.health', 'id' => 1]);
         $context = new RequestContext(
@@ -63,18 +60,16 @@ final class CoreDirectUsageTest extends TestCase
             headers: [],
             clientIp: '127.0.0.1',
         );
-        $result = $engine->handleJson($json, $context);
+        $response = $server->handleJson($json, $context);
 
-        $this->assertFalse($result->isNoContent());
-        $this->assertEquals(200, $result->statusCode);
-        $data = json_decode($result->json, true);
+        $this->assertNotNull($response);
+        $data = json_decode($response, true);
         $this->assertEquals('ok', $data['result']['status']);
     }
 
-    public function testDirectEngineWithCustomContext(): void
+    public function testDirectJsonUsagePreservesCustomContextAttributes(): void
     {
         $server = $this->createServer();
-        $engine = $server->getEngine();
 
         $context = new RequestContext(
             correlationId: 'test-ctx',
@@ -84,8 +79,8 @@ final class CoreDirectUsageTest extends TestCase
         );
 
         $json = json_encode(['jsonrpc' => '2.0', 'method' => 'system.health', 'id' => 1]);
-        $result = $engine->handleJson($json, $context);
+        $result = $server->handleJson($json, $context);
 
-        $this->assertNotNull($result->json);
+        $this->assertNotNull($result);
     }
 }

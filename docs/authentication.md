@@ -13,7 +13,7 @@ Lumen JSON-RPC handles **JWT validation and method protection**. It does **not**
 - Signature verification for supported HMAC algorithms
 - Claim checks for `exp`, `nbf`, `iat`, `iss`, and `aud` when configured
 - Token extraction from the HTTP `Authorization` header
-- Method protection through prefix-based `protected_methods`
+- Method protection through exact-method or prefix-based `protected_methods`
 - Injection of authentication data into `RequestContext`
 
 ### 🧩 What your application handles
@@ -36,7 +36,7 @@ In short:
 | Scenario                                                   | Behavior                                                                                                                          |
 | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `auth.enabled = false` _(default)_                         | No authentication is performed. All methods are public.                                                                           |
-| `auth.enabled = true` + no protected prefix match          | A token is validated if present, and auth info is injected into `RequestContext`. The method still remains callable without auth. |
+| `auth.enabled = true` + no protected match                 | A token is validated if present, and auth info is injected into `RequestContext`. The method still remains callable without auth. |
 | `auth.enabled = true` + method matches `protected_methods` | The method requires valid credentials. Missing or invalid credentials result in `-32001 Authentication required`.                 |
 | Valid token on a protected method                          | The request proceeds and auth claims are available through `RequestContext`.                                                      |
 | Valid token on a non-protected method                      | The request still proceeds, and the handler may optionally use the auth context.                                                  |
@@ -84,10 +84,16 @@ When enabled, the server will use the configured `driver` to authenticate reques
 
 Default: `[]`
 
-This is a list of **method prefixes**.
+This is a list of exact method names or trailing-separator prefixes.
 
 ```php
 'protected_methods' => ['user.', 'order.']
+```
+
+You can also protect a single method exactly:
+
+```php
+'protected_methods' => ['user.get']
 ```
 
 This means:
@@ -97,6 +103,8 @@ This means:
 - `order.list` is protected
 - `auth.login` is **not** protected
 - `system.health` is **not** protected
+
+Exact names match exactly. Trailing-separator entries like `user.` stay prefix-based and protect all methods under that handler namespace.
 
 This is a lightweight access gate, not a full authorization system.
 
@@ -166,7 +174,7 @@ The API key driver reads a key from the configured header and matches it against
     'basic' => [
         'users' => [
             'admin' => [
-                'password' => 'secret',
+                'password_hash' => password_hash('secret', PASSWORD_DEFAULT),
                 'user_id' => 'admin',
                 'roles' => ['admin'],
             ],
@@ -175,7 +183,7 @@ The API key driver reads a key from the configured header and matches it against
 ],
 ```
 
-The Basic auth driver reads standard `Authorization: Basic <base64>` headers. Passwords are verified using `hash_equals` for timing-safe comparison. No external library required.
+The Basic auth driver reads standard `Authorization: Basic <base64>` headers. It accepts either a precomputed `password_hash` or a plaintext `password` entry per user. Prefer `password_hash` for production Basic auth credentials; plaintext `password` remains available for development and tests. No external library required.
 
 ---
 
@@ -201,8 +209,48 @@ Useful helpers:
 - `$context->authUserId`
 - `$context->authRoles`
 - `$context->authClaims`
+
+## Direct JSON usage with auth
+
+When using `JsonRpcServer::handleJson()` outside HTTP, build a `RequestContext` with headers and let the server authenticate it through the stable public API:
+
+```php
+use Lumen\JsonRpc\Support\RequestContext;
+
+$context = new RequestContext(
+    correlationId: 'job-123',
+    headers: ['Authorization' => 'Bearer <token>'],
+    clientIp: '127.0.0.1',
+);
+
+$context = $server->authenticateContext($context);
+$json = $server->handleJson('{"jsonrpc":"2.0","method":"user.me","id":1}', $context);
+```
+
+You can also skip the explicit authentication step and pass the context directly to `handleJson()`. The server will authenticate from headers automatically when auth is enabled.
+
 - `$context->getClaim('email')`
 - `$context->hasRole('admin')`
+
+## Custom request authenticators
+
+For advanced integrations, you can replace the built-in header parser with your own `RequestAuthenticatorInterface` implementation through the stable `JsonRpcServer` API:
+
+```php
+use Lumen\JsonRpc\Auth\RequestAuthenticatorInterface;
+use Lumen\JsonRpc\Auth\UserContext;
+
+$server->setRequestAuthenticator(new class implements RequestAuthenticatorInterface {
+    public function authenticateFromHeaders(array $headers): ?UserContext
+    {
+        if (($headers['X-Internal-Token'] ?? null) !== 'trusted-token') {
+            return null;
+        }
+
+        return new UserContext('internal-service', ['source' => 'internal'], ['service']);
+    }
+});
+```
 
 ---
 

@@ -58,7 +58,7 @@ return [
         'enabled' => true,
     ],
     'validation' => [
-        'strict' => true,
+        'strict' => false,
     ],
     'content_type' => [
         'strict' => false,

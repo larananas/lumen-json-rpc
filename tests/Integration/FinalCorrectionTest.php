@@ -275,16 +275,12 @@ final class FinalCorrectionTest extends TestCase
     #[WithoutErrorHandler]
     public function testFailClosedDeniesOnStorageError(): void
     {
-        if (PHP_OS_FAMILY === 'Windows') {
-            $this->markTestSkipped('Fail-closed behavior cannot be reliably tested on Windows due to POSIX permission differences');
-        }
-        $readonlyDir = sys_get_temp_dir() . '/jsonrpc_ro_closed_' . uniqid();
-        mkdir($readonlyDir, 0755, true);
-        chmod($readonlyDir, 0555);
+        $blockingPath = sys_get_temp_dir() . '/jsonrpc_ro_closed_' . uniqid() . '.tmp';
+        touch($blockingPath);
         $limiter = new FileRateLimiter(
             maxRequests: 5,
             windowSeconds: 60,
-            storagePath: $readonlyDir . '/deep',
+            storagePath: $blockingPath,
             failOpen: false,
         );
 
@@ -297,8 +293,7 @@ final class FinalCorrectionTest extends TestCase
             restore_error_handler();
         }
 
-        chmod($readonlyDir, 0755);
-        @rmdir($readonlyDir);
+        @unlink($blockingPath);
         $this->assertFalse($result->allowed);
     }
 

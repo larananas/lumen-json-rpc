@@ -7,6 +7,7 @@ namespace Lumen\JsonRpc\Tests\Integration;
 use Lumen\JsonRpc\Config\Config;
 use Lumen\JsonRpc\Http\HttpRequest;
 use Lumen\JsonRpc\Server\JsonRpcServer;
+use PHPUnit\Framework\Attributes\WithoutErrorHandler;
 use PHPUnit\Framework\TestCase;
 
 final class SecurityHardeningTest extends TestCase
@@ -208,6 +209,101 @@ final class SecurityHardeningTest extends TestCase
         $decoded = json_decode($response->body, true);
         $this->assertIsArray($decoded);
         $this->assertCount(3, $decoded);
+    }
+
+    #[WithoutErrorHandler]
+    public function testRateLimitFailsClosedByDefaultWhenStorageIsUnavailable(): void
+    {
+        $blockingFile = tempnam(sys_get_temp_dir(), 'jsonrpc_rl_block_');
+        $this->assertNotFalse($blockingFile);
+
+        try {
+            $config = $this->createConfig([
+                'rate_limit' => [
+                    'enabled' => true,
+                    'max_requests' => 3,
+                    'window_seconds' => 60,
+                    'strategy' => 'ip',
+                    'storage_path' => $blockingFile . '/deep',
+                    'batch_weight' => 1,
+                ],
+            ]);
+
+            $server = new JsonRpcServer($config);
+            $warnings = [];
+
+            set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
+                if ($severity === E_USER_WARNING) {
+                    $warnings[] = $message;
+                    return true;
+                }
+
+                return false;
+            });
+
+            try {
+                $response = $server->handle($this->createRequest('{"jsonrpc":"2.0","method":"system.health","id":1}'));
+            } finally {
+                restore_error_handler();
+            }
+
+            $decoded = json_decode($response->body, true);
+
+            $this->assertSame(429, $response->statusCode);
+            $this->assertSame(-32000, $decoded['error']['code']);
+            $this->assertNotEmpty($warnings);
+            $this->assertStringContainsString('fail-closed denying request', $warnings[0]);
+        } finally {
+            @unlink($blockingFile);
+        }
+    }
+
+    #[WithoutErrorHandler]
+    public function testRateLimitCanStillFailOpenWhenExplicitlyEnabled(): void
+    {
+        $blockingFile = tempnam(sys_get_temp_dir(), 'jsonrpc_rl_block_');
+        $this->assertNotFalse($blockingFile);
+
+        try {
+            $config = $this->createConfig([
+                'rate_limit' => [
+                    'enabled' => true,
+                    'max_requests' => 3,
+                    'window_seconds' => 60,
+                    'strategy' => 'ip',
+                    'storage_path' => $blockingFile . '/deep',
+                    'batch_weight' => 1,
+                    'fail_open' => true,
+                ],
+            ]);
+
+            $server = new JsonRpcServer($config);
+            $warnings = [];
+
+            set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
+                if ($severity === E_USER_WARNING) {
+                    $warnings[] = $message;
+                    return true;
+                }
+
+                return false;
+            });
+
+            try {
+                $response = $server->handle($this->createRequest('{"jsonrpc":"2.0","method":"system.health","id":1}'));
+            } finally {
+                restore_error_handler();
+            }
+
+            $decoded = json_decode($response->body, true);
+
+            $this->assertSame(200, $response->statusCode);
+            $this->assertArrayHasKey('result', $decoded);
+            $this->assertNotEmpty($warnings);
+            $this->assertStringContainsString('fail-open allowing request', $warnings[0]);
+        } finally {
+            @unlink($blockingFile);
+        }
     }
 
     public function testInvalidConfigMaxBodySizeZeroThrows(): void

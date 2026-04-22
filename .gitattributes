@@ -1,7 +1,7 @@
 # Normalisation
 * text=auto eol=lf
 
-# Export-ignore — excluded from dist archives (Packagist / GitHub Release)
+# Export-ignore — excluded from source/dist archives (Packagist / GitHub source archives)
 .gitattributes          export-ignore
 .gitignore              export-ignore
 .editorconfig           export-ignore
@@ -10,7 +10,6 @@ tests/                  export-ignore
 examples/               export-ignore
 docs/                   export-ignore
 docs-site/              export-ignore
-docs-site-src/          export-ignore
 .phpunit.result.cache   export-ignore
 .phpactor.json          export-ignore
 phpunit.xml             export-ignore
@@ -20,8 +19,9 @@ infection.json5         export-ignore
 SECURITY.md             export-ignore
 CONTRIBUTING.md         export-ignore
 CHANGELOG.md            export-ignore
-.ai                     export-ignore
+.ai/                    export-ignore
 bin/verify-package.php  export-ignore
+bin/check-coverage-driver.php export-ignore
 bin/check-coverage.php  export-ignore
 bin/build-docs-site.php export-ignore
 bin/lint-syntax.php     export-ignore
