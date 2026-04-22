@@ -25,3 +25,4 @@ bin/check-coverage-driver.php export-ignore
 bin/check-coverage.php  export-ignore
 bin/build-docs-site.php export-ignore
 bin/lint-syntax.php     export-ignore
+build/                  export-ignore

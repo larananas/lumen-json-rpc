@@ -9,6 +9,7 @@ coverage.xml
 coverage/
 dist.tar
 /lumen-json-rpc.zip
+/build/
 
 # Lock file (library — consumers resolve their own versions)
 composer.lock
