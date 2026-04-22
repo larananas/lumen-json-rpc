@@ -1,5 +1,9 @@
 name: Deploy Docs
 
+permissions:
+  contents: read
+  pull-requests: write
+
 on:
   release:
     types: [published]

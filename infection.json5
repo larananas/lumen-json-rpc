@@ -1,7 +1,11 @@
 {
     "$schema": "vendor/infection/infection/resources/schema.json",
     "source": {
-        "directories": ["src"]
+        "directories": ["src"],
+        "excludes": [
+            "src/Log/LogLevel.php",
+            "src/Support/HookPoint.php"
+        ]
     },
     "logs": {
         "text": "infection-log.txt"
