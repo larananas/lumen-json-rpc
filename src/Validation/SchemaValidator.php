@@ -430,11 +430,15 @@ final class SchemaValidator
         }
         $timeParts = explode(':', $timePart);
         if (count($timeParts) >= 3) {
-            $hour = (int)$timeParts[0];
-            $minute = (int)$timeParts[1];
-            $second = (int)$timeParts[2];
-            if ($hour > 23 || $minute > 59 || $second > 59) {
-                $errors[] = "date-time time components out of range";
+            if (!ctype_digit($timeParts[0]) || !ctype_digit($timeParts[1]) || !ctype_digit($timeParts[2])) {
+                $errors[] = "date-time time components must be numeric";
+            } else {
+                $hour = (int)$timeParts[0];
+                $minute = (int)$timeParts[1];
+                $second = (int)$timeParts[2];
+                if (!$this->isTimeInRange($hour, $minute, $second)) {
+                    $errors[] = "date-time time components out of range";
+                }
             }
         }
 
@@ -463,14 +467,22 @@ final class SchemaValidator
         }
         $parts = explode(':', $timePart);
         if (count($parts) >= 3) {
+            if (!ctype_digit($parts[0]) || !ctype_digit($parts[1]) || !ctype_digit($parts[2])) {
+                return ["time components must be numeric"];
+            }
             $hour = (int)$parts[0];
             $minute = (int)$parts[1];
             $second = (int)$parts[2];
-            if ($hour > 23 || $minute > 59 || $second > 59) {
+            if (!$this->isTimeInRange($hour, $minute, $second)) {
                 return ["time components out of range"];
             }
         }
         return [];
+    }
+
+    private function isTimeInRange(int $hour, int $minute, int $second): bool
+    {
+        return $hour <= 23 && $minute <= 59 && $second <= 59;
     }
 
     /**

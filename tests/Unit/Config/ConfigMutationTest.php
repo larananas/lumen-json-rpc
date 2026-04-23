@@ -63,4 +63,34 @@ final class ConfigMutationTest extends TestCase
         $config->set('top', 'value');
         $this->assertSame('value', $config->get('top'));
     }
+
+    public function testFromFileNonArrayErrorMessageContainsPath(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'cfg');
+        file_put_contents($path, '<?php return "not_array";');
+        try {
+            Config::fromFile($path);
+            $this->fail('Expected RuntimeException');
+        } catch (\RuntimeException $e) {
+            $msg = $e->getMessage();
+            $this->assertStringContainsString('got string in:', $msg);
+            $this->assertStringContainsString(basename($path), $msg);
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    public function testFromFileNonArrayErrorMessageContainsType(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'cfg');
+        file_put_contents($path, '<?php return 42;');
+        try {
+            Config::fromFile($path);
+            $this->fail('Expected RuntimeException');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('got integer in:', $e->getMessage());
+        } finally {
+            @unlink($path);
+        }
+    }
 }

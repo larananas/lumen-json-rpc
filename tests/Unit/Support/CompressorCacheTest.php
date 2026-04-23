@@ -85,4 +85,26 @@ final class CompressorCacheTest extends TestCase
         $decoded = Compressor::decodeGzip($encoded);
         $this->assertSame($original, $decoded);
     }
+
+    public function testIsGzippedExactTwoByteHeaderIsValid(): void
+    {
+        $this->assertTrue(Compressor::isGzipped("\x1f\x8b"));
+    }
+
+    public function testIsGzippedSingleByteIsNotValid(): void
+    {
+        $this->assertFalse(Compressor::isGzipped("\x1f"));
+    }
+
+    public function testDecodeGzipEmptyStringReturnsNull(): void
+    {
+        $this->assertNull(Compressor::decodeGzip(''));
+    }
+
+    public function testIsZlibAvailableRequiresBothFunctions(): void
+    {
+        $this->assertTrue(Compressor::isZlibAvailable());
+        $this->assertTrue(function_exists('gzdecode'));
+        $this->assertTrue(function_exists('gzencode'));
+    }
 }

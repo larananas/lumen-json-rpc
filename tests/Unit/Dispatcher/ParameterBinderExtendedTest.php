@@ -164,6 +164,33 @@ final class ParameterBinderExtendedTest extends TestCase
         $this->binder->bind($method, ['count' => 3.14], $this->context);
     }
 
+    public function testUnknownParamsErrorMessageContainsKeys(): void
+    {
+        $method = new ReflectionMethod($this, 'simpleMethod');
+        try {
+            $this->binder->bind($method, ['name' => 'test', 'bogus' => 'x'], $this->context);
+            $this->fail('Expected InvalidParamsException');
+        } catch (InvalidParamsException $e) {
+            $msg = $e->getMessage();
+            $this->assertStringStartsWith('Unknown parameters: ', $msg);
+            $this->assertStringContainsString('bogus', $msg);
+        }
+    }
+
+    public function testArrayParamWrongTypeErrorMessageContainsTypeName(): void
+    {
+        $method = new ReflectionMethod($this, 'methodWithArray');
+        try {
+            $this->binder->bind($method, ['items' => 'not-array'], $this->context);
+            $this->fail('Expected InvalidParamsException');
+        } catch (InvalidParamsException $e) {
+            $msg = $e->getMessage();
+            $this->assertStringContainsString('items', $msg);
+            $this->assertStringContainsString('string', $msg);
+            $this->assertMatchesRegularExpression('/expects array, got \w+/', $msg);
+        }
+    }
+
     public function emptyMethod(): void {}
     public function onlyContext(RequestContext $context): void {}
     public function simpleMethod(string $name, int $age): array { return []; }

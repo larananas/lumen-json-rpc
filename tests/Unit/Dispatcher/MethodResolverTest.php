@@ -166,4 +166,20 @@ final class MethodResolverTest extends TestCase
         $this->assertEquals('App\\Handlers\\System', $result->className);
         $this->assertEquals('health', $result->methodName);
     }
+
+    public function testReservedRpcPrefixIsRejectedEvenWithHandlerFile(): void
+    {
+        $tmpDir = sys_get_temp_dir() . '/jsonrpc_rpc_test_' . uniqid();
+        mkdir($tmpDir, 0755, true);
+        file_put_contents($tmpDir . '/Rpc.php', '<?php class Rpc {}');
+
+        try {
+            $resolver = new MethodResolver([$tmpDir], 'App\\', '.');
+            $result = $resolver->resolve('rpc.anything');
+            $this->assertNull($result);
+        } finally {
+            @unlink($tmpDir . '/Rpc.php');
+            @rmdir($tmpDir);
+        }
+    }
 }

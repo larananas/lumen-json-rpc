@@ -126,4 +126,20 @@ final class RequestTest extends TestCase
         $this->assertNull($request->id);
         $this->assertNull($request->params);
     }
+
+    public function testToArrayReturnsExactJsonrpcAndMethodValues(): void
+    {
+        $request = new Request('user.create', 42, null, true, '2.0');
+        $arr = $request->toArray();
+        $this->assertSame('2.0', $arr['jsonrpc']);
+        $this->assertSame('user.create', $arr['method']);
+        $this->assertSame(42, $arr['id']);
+    }
+
+    public function testToArrayWithParamsIncludesExactParams(): void
+    {
+        $request = new Request('test', 1, ['key' => 'value'], true);
+        $arr = $request->toArray();
+        $this->assertSame(['key' => 'value'], $arr['params']);
+    }
 }

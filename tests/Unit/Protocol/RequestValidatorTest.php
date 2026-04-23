@@ -189,4 +189,16 @@ final class RequestValidatorTest extends TestCase
         $this->assertNotNull($error);
         $this->assertEquals(-32600, $error->code);
     }
+
+    public function testStrictModeErrorMessageFormat(): void
+    {
+        $validator = new RequestValidator(strict: true);
+        $data = ['jsonrpc' => '2.0', 'method' => 'test', 'id' => 1, 'foo' => 1, 'bar' => 2];
+        $error = $validator->validateArray($data);
+        $this->assertNotNull($error);
+        $msg = $error->data ?? $error->message;
+        $this->assertStringStartsWith('unexpected members: ', (string) $msg);
+        $this->assertStringContainsString('foo', (string) $msg);
+        $this->assertStringContainsString('bar', (string) $msg);
+    }
 }

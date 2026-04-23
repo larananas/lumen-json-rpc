@@ -141,4 +141,28 @@ final class LogRotatorExtendedTest extends TestCase
 
         $this->assertSame('', file_get_contents($logPath));
     }
+
+    public function testExactSizeBoundaryTriggersRotation(): void
+    {
+        $logPath = $this->testDir . '/test.log';
+        $content = str_repeat('a', 100);
+        file_put_contents($logPath, $content);
+
+        $rotator = new LogRotator(maxSize: 100, maxFiles: 3, compress: false);
+        $rotator->rotateIfNeeded($logPath);
+
+        $this->assertFileExists($logPath . '.1');
+    }
+
+    public function testDefaultConstructorCompressProducesGzExtension(): void
+    {
+        $logPath = $this->testDir . '/test.log';
+        file_put_contents($logPath, str_repeat('x', 10_485_761));
+
+        $rotator = new LogRotator();
+        $rotator->rotateIfNeeded($logPath);
+
+        $this->assertFileExists($logPath . '.1.gz');
+        $this->assertFileDoesNotExist($logPath . '.1');
+    }
 }

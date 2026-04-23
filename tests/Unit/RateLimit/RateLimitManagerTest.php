@@ -181,4 +181,18 @@ final class RateLimitManagerTest extends TestCase
         $ctx = new RequestContext('cid', [], '127.0.0.1');
         $manager->check($ctx, 2);
     }
+
+    public function testStrategyUserAnonymousKeyStartsWithAnonymousPrefix(): void
+    {
+        $limiter = $this->createMock(RateLimiterInterface::class);
+        $limiter->expects($this->once())->method('check')
+            ->with($this->equalTo('anonymous_192.168.1.1'))
+            ->willReturn(RateLimitResult::allowed(99, time() + 60, 100));
+
+        $manager = new RateLimitManager(true, 'user', 1);
+        $manager->setLimiter($limiter);
+
+        $ctx = new RequestContext('cid', [], '192.168.1.1');
+        $manager->check($ctx);
+    }
 }

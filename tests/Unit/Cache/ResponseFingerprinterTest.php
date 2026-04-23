@@ -48,4 +48,22 @@ final class ResponseFingerprinterTest extends TestCase
         $this->assertTrue($enabled->isEnabled());
         $this->assertFalse($disabled->isEnabled());
     }
+
+    public function testFingerprintUsesUnescapedSlashes(): void
+    {
+        $fp = new ResponseFingerprinter(true);
+        $data = ['url' => 'https://example.com/path'];
+        $fingerprint = $fp->fingerprint($data);
+        $json = json_encode(['url' => 'https://example.com/path'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        $this->assertSame(hash('sha256', $json), $fingerprint);
+    }
+
+    public function testFingerprintUsesUnescapedUnicode(): void
+    {
+        $fp = new ResponseFingerprinter(true);
+        $data = ['name' => 'café'];
+        $fingerprint = $fp->fingerprint($data);
+        $json = json_encode(['name' => 'café'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        $this->assertSame(hash('sha256', $json), $fingerprint);
+    }
 }

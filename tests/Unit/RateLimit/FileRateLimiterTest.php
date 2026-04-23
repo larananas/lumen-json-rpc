@@ -177,4 +177,31 @@ final class FileRateLimiterTest extends TestCase
 
     return $path;
   }
+
+  #[WithoutErrorHandler]
+  public function testFailOpenRemainingIsMaxRequestsMinusOne(): void
+  {
+    $blockingPath = $this->createBlockingStoragePath('remaining-test');
+
+    $limiter = new FileRateLimiter(
+      10,
+      60,
+      $blockingPath,
+      failOpen: true,
+    );
+
+    set_error_handler(static function (int $severity): bool {
+      return $severity === E_USER_WARNING;
+    });
+
+    try {
+      $result = $limiter->check("remaining-test");
+    } finally {
+      restore_error_handler();
+    }
+
+    $this->assertTrue($result->allowed);
+    $this->assertSame(9, $result->remaining);
+    $this->assertSame(10, $result->limit);
+  }
 }

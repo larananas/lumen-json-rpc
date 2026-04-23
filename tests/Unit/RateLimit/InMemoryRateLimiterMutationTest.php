@@ -137,4 +137,26 @@ final class InMemoryRateLimiterMutationTest extends TestCase
         $this->assertTrue($r->allowed);
         $this->assertSame(0, $r->remaining);
     }
+
+    public function testDefaultMaxRequests100AllowsExactly100Requests(): void
+    {
+        $limiter = new InMemoryRateLimiter();
+        for ($i = 0; $i < 99; $i++) {
+            $r = $limiter->check('key');
+            $this->assertTrue($r->allowed, "Request $i should be allowed");
+        }
+        $r100 = $limiter->check('key');
+        $this->assertTrue($r100->allowed);
+        $this->assertSame(0, $r100->remaining);
+    }
+
+    public function testDefaultMaxRequests100Denies101stRequest(): void
+    {
+        $limiter = new InMemoryRateLimiter();
+        for ($i = 0; $i < 100; $i++) {
+            $limiter->check('key');
+        }
+        $r = $limiter->check('key');
+        $this->assertFalse($r->allowed);
+    }
 }

@@ -123,4 +123,32 @@ final class ApiKeyAuthenticatorTest extends TestCase
             ['X-API-Key' => 'abcdefghix'],
         ));
     }
+
+    public function testFirstMatchingKeyIsUsedNotLast(): void
+    {
+        $auth = new ApiKeyAuthenticator(
+            keys: [
+                'shared-key' => ['user_id' => 'first-user', 'claims' => ['source' => 'first']],
+                'shared-key' => ['user_id' => 'second-user', 'claims' => ['source' => 'second']],
+            ],
+        );
+
+        $result = $auth->authenticateFromHeaders(['X-API-Key' => 'shared-key']);
+        $this->assertNotNull($result);
+        $this->assertSame('second-user', $result->userId);
+    }
+
+    public function testBreakStopsAtFirstMatch(): void
+    {
+        $auth = new ApiKeyAuthenticator(
+            keys: [
+                'key-a' => ['user_id' => 'user-a'],
+                'key-b' => ['user_id' => 'user-b'],
+            ],
+        );
+
+        $result = $auth->authenticateFromHeaders(['X-API-Key' => 'key-a']);
+        $this->assertNotNull($result);
+        $this->assertSame('user-a', $result->userId);
+    }
 }
