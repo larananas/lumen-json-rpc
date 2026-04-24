@@ -86,7 +86,7 @@ jobs:
       - run: composer install --prefer-dist --no-interaction --no-progress
       - run: vendor/bin/phpunit --coverage-text --coverage-clover=coverage.xml
       - run: php bin/check-coverage.php
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: coverage-report
